@@ -25,6 +25,8 @@
 *.lib
 *.sbr
 *.sdf
+*.csproj
+*.sln
 ipch/
 obj/
 [Bb]in

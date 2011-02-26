@@ -7,5 +7,6 @@ namespace NRH5Roguelike.Entity
 {
 	class Monster
 	{
+        string name;
 	}
 }
