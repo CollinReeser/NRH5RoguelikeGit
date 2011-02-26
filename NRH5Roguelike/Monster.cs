@@ -9,5 +9,6 @@ namespace NRH5Roguelike.Entity
 	{
         string name;
         int baseSpeed;
+        bool isPlayer;
 	}
 }
