@@ -8,5 +8,6 @@ namespace NRH5Roguelike.Object
 	class Item
 	{
         string name;
+        int weight;
 	}
 }
