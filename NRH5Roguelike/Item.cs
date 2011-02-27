@@ -7,7 +7,8 @@ namespace NRH5Roguelike.Object
 {
 	class Item
 	{
-        string name;
-        int weight;
+        // Data fields
+        private string name;
+        private int weight;
 	}
 }
