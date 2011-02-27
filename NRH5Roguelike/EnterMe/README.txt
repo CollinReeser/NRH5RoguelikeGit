@@ -1,0 +1,1 @@
+Place the contents of this folder, except for this file, into the bin>Debug directory for proper functionality.
