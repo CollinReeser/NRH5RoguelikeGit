@@ -8,8 +8,6 @@
 //   the graphical library, and documented them heavily -- Collin Reeser
 //
 // TODO:
-// - See if the credits animation screwing with the entire background thing can
-//   be fixed
 // - Actually implement the main loop and all that necessary nonsense for an
 //   actual game
 //
@@ -78,6 +76,13 @@ namespace NRH5Roguelike
             while ( !TCODConsole.isWindowClosed() && Key.KeyCode != 
                 TCODKeyCode.Escape )
             {
+                // Set the default background color of the root console with
+                // black. This is neccessary because the credits animation
+                // changes the default background color for some reason
+                if ( !creditsDone )
+                {
+                    TCODConsole.root.setBackgroundColor( TCODColor.black );
+                }
                 // Make sure the screen is blank before writing on it again with
                 // graphical updates
                 TCODConsole.root.clear();
@@ -130,7 +135,7 @@ namespace NRH5Roguelike
                         "TROLOLOLOLOL XD" );
                     TCODConsole.root.printEx( x + 1 , y , 
                         TCODBackgroundFlag.Set , TCODAlignment.LeftAlignment ,
-                        " DX TROLOLOLOLOL" );
+                        "DX TROLOLOLOLOL" );
                     // Revert the foreground color back to white for printing
                     // everything else
                     TCODConsole.root.setForegroundColor( TCODColor.white );
