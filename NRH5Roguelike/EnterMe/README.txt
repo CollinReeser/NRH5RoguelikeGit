@@ -1,1 +1,3 @@
 Place the contents of this folder, except for this file, into the bin>Debug directory for proper functionality.
+
+Once you do that, open Visual Studio, open the Roguelike project, and on the right, right-click on the project file, entitled "NRH5Roguelike", click "Add Reference...", click the Browse tab, go to bin>Debug, where the files you just put are, and add "libtcod-net.dll" as a reference. Then you should be good to go.
