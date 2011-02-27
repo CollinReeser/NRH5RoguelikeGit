@@ -15,6 +15,8 @@ namespace NRH5Roguelike
             Console.WriteLine("Hello World!");
             Console.WriteLine( "Seriously even!" );
             Console.WriteLine("Commit by Alex Williams.");
+            Console.WriteLine("I want you inside me.");
+            Console.Beep();
         }
     }
 }
