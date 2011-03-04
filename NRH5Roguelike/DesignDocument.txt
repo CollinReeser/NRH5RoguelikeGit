@@ -1,0 +1,16 @@
+﻿This file is sort of a catch all for anybody who wants to add ideas they had.
+In addition, it shall be a repository for things that need to be kept in mind
+while designing the framework.
+
+Dungeon Layers Needed:
+Dungeon Layer
+Item Layer
+Monster Layer
+Totem Layer
+Effects Layer
+Events Layer
+Pathfinding Exception Layer (Maybe)
+OnceSeen Layer (What the player has seen already but has not already seen, so
+				that the edges of the game screen is actuall interesting. This
+				area will also be heavily dimmed compared to the area the player
+				can see)

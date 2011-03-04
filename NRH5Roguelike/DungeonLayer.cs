@@ -18,44 +18,137 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using libtcod;
 
 namespace NRH5Roguelike.Dungeon
 {
 	class DungeonLayer
 	{
+        // Default values for dungeon size
+        private static readonly short DUNGEON_HEIGHT = 55;
+        private static readonly short DUNGEON_WIDTH = 80;
         // This holds the map information for semi-permanent features of the
         // dungeon, and is what the player actually explores
-        private short[][] dungeon;
+        private short[,] dungeon;
+        // This is used for printing to the game screen
+        private readonly TCODConsole console;
+
+        // Name: DungeonLayer (constructor)
+        // Description: Creates an instance of the DungeonLayer class
+        public DungeonLayer( TCODConsole console )
+        {
+            this.console = console;
+            dungeon = new short[DUNGEON_HEIGHT , DUNGEON_WIDTH];
+            // Create an empty dungeon
+            this.fillDefaultFloor();
+            this.injectPerimiter();
+        }
+
+        // Name: getHeight
+        // Description: Returns the length of the array of the dungeon that
+        //              represents the height of the dungeon, and is the part of
+        //              the array indexed by the first set of brackets
+        // Return: int , returns the length of the first array of the dungeon
+        public int getHeight()
+        {
+            return dungeon.GetLength(0);
+        }
+
         // Name: getWidth
         // Description: Returns the length of the array of the dungeon that
         //              represents the width of the dungeon, and is the part of
         //              the array indexed by the second set of brackets
-        // Return: Returns the length of the arrays held by the first array of
-        //         dungeon
+        // Return: int , returns the length of the arrays held by the first 
+        //         array of dungeon
+        public int getWidth()
+        {
+            return dungeon.GetLength(1);
+        }
+
+        // Name: fillDefaultFloor
+        // Description: Fills the entire array minus the area that will be
+        //              filled by injectPerimeter with the default flooring
+        private void fillDefaultFloor()
+        {
+            for (int yCoord = 0; yCoord < dungeon.GetLength(0); yCoord++)
+            {
+                for (int xCoord = 0; xCoord < dungeon.GetLength(1); xCoord++)
+                {
+                    dungeon[yCoord, xCoord] = 
+                        (short)DungeonInformation.DungeonTiles.GREY_STONE_FLOOR;
+                }
+            }
+        }
+
+        // Name: injectPerimeter
+        // Description: Adds a perimeter of superstone (impassable under any
+        //              and all circumstances) around the edges of the map
+        private void injectPerimiter()
+        {
+            // Left hand perimeter
+            for ( int yCoord = 0; yCoord < dungeon.GetLength(0); yCoord++ )
+            {
+                dungeon[yCoord , 0] = 
+                    (short) DungeonInformation.DungeonTiles.SUPER_STONE;
+            }
+            // Right hand perimeter
+            for (int yCoord = 0; yCoord < dungeon.GetLength(0); yCoord++)
+            {
+                dungeon[yCoord, dungeon.GetLength(1) - 1] =
+                    (short)DungeonInformation.DungeonTiles.SUPER_STONE;
+            }
+            // Upper perimeter. These two start at 1 and end at just before the
+            // last index because the previous two fors already filled those
+            // spots with superstone, so this is an eensy optimization
+            for (int xCoord = 1; xCoord < dungeon.GetLength(1) - 1; xCoord++)
+            {
+                dungeon[0, xCoord] =
+                    (short)DungeonInformation.DungeonTiles.SUPER_STONE;
+            }
+            // Lower perimeter
+            for (int xCoord = 1; xCoord < dungeon.GetLength(1) - 1; xCoord++)
+            {
+                dungeon[dungeon.GetLength(0) - 1, xCoord] =
+                    (short)DungeonInformation.DungeonTiles.SUPER_STONE;
+            }
+        }
+
+        // Name: printToScreen
+        // Description: Prints the dungeon to the screen.
+        //              For now: Displays the entire dungeon to the entire
+        //              screen, assuming there is enough room
+        //              In the future: Should account for the OnceSeen Layer,
+        //              and only display to the game area of the game screen
+        public void printToScreen()
+        {
+            for (int yCoord = 0; yCoord < dungeon.GetLength(0) &&
+                yCoord < console.getHeight(); yCoord++)
+            {
+                for (int xCoord = 0; xCoord < dungeon.GetLength(1) &&
+                xCoord < console.getWidth(); xCoord++)
+                {
+                    console.putCharEx(xCoord , yCoord ,
+                        DungeonInformation.getASCIICode(
+                        dungeon[yCoord, xCoord] ) ,
+                        TCODColor.white, TCODColor.black );
+                }
+            }
+        }
+
+        // Name: printMapToConsole
+        // Description: Prints the map to the console
+        public void printMapToConsole()
+        {
+            for (int yCoord = 0; yCoord < dungeon.GetLength(0); yCoord++)
+            {
+                for (int xCoord = 0; xCoord < dungeon.GetLength(1); xCoord++)
+                {
+                    Console.Write( 
+                        DungeonInformation.getASCIICode( 
+                        dungeon[yCoord, xCoord] ) );
+                }
+                Console.WriteLine();
+            }
+        }
 	}
-    // This is going to be the worlds most goddamn massive enum ever, Jesus. So
-    // this enum describes every single tile that can exist in a dungeon, from
-    // the most basic floor and wall tiles to sand floors and sand walls to
-    // muddy tiles and muddy floors and whatever the hell else. Just make sure
-    // that something that should be represented in the Effects layer, like
-    // water, does not appear here. Another example is while we can have sand
-    // tiles, if the floor is not sandy sandstone, but is instead three feet of
-    // quicksand, the floor itself can be whatever but the effects layer is
-    // where the quicksand behavior itself should lay. Depending on where our
-    // implementation takes us, colors may be left out in favor of a different
-    // system, but for now this is fine
-    public static enum DungeonTiles
-    {
-        GREY_STONE_FLOOR , 
-        GREY_STONE_WALL
-    }
-    // This is an equally massive string array that holds the string
-    // representations for each of these possible dungeon tile features. The
-    // separation is necessary so that the DungeonTiles enum refers to numbers,
-    // and the DungeonTilesDesc enum refers to descriptions
-    public static enum DungeonTilesDesc
-    {
-        GREY_STONE_FLOOR = "grey stone floor" , 
-        GREY_STONE_WALL = "grey stone wall"
-    }
 }

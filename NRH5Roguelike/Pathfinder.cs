@@ -60,28 +60,80 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using libtcod;
+using NRH5Roguelike.Entity;
+using NRH5Roguelike.Dungeon;
 
 namespace NRH5Roguelike.Utility
 {
-    class Pathfinder
+    static class Pathfinder
     {
+        // Name: Main (unit test)
+        // Description: This is the unit test of the pathfinder. It will be
+        //              used to exhaustively test the features of the pathfinder
+        //              to ensure that not only does it work correctly with
+        //              optimal input data, but handles gracefully bad input
+        //              data, and does it all in an extremely efficient, 
+        //              optimized, sexy-speedy manner
+        static void Main( string[] args )
+        {
+            // Define constants for the size of the window so that window-
+            //dependant things can be easily updated
+            const int WINDOW_WIDTH = 80;
+            const int WINDOW_HEIGHT = 55;
+            // Display an initializing message to the console
+            Console.WriteLine("Initilizing game window...");
+            // Create the new libtcod output window. This needs to be done only
+            // once, but before anything else. The first value is the width in
+            // cells the window is, the second is the height in cells, and the
+            // third is the name of the window
+            TCODConsole.initRoot(WINDOW_WIDTH, WINDOW_HEIGHT,
+                "Hello World!");
+            // Set the maximum graphical update speed. This is important to
+            // massively reduce CPU use with unnecessary updates
+            TCODSystem.setFps(30);
+            // Set the default background color of the root console with black
+            TCODConsole.root.setBackgroundColor(TCODColor.black);
+            // Clear is a function that overwrites every cell in the window with
+            // a plain, empty cell of the color dictated by setBackgroundColor()
+            TCODConsole.root.clear();
+            // Flush writes the graphical data that is pending to the screen.
+            // Any graphics updates are not shown to the screen until flush is
+            // called. Try to minimize this call
+            TCODConsole.flush();
+            TCODKey Key = TCODConsole.checkForKeypress();
+            // Create dungeon objects eventually to be used for pathfinding test
+            Monster monster = new Monster();
+            DungeonLevel dungeon = new DungeonLevel(TCODConsole.root);
+            // While the user has not closed the window and while the user has
+            // not pressed escape, do stuff
+            while ( !TCODConsole.isWindowClosed() && Key.KeyCode != 
+                TCODKeyCode.Escape )
+            {
+                Key = TCODConsole.waitForKeypress(true);
+                dungeon.printToScreen();
+                TCODConsole.flush();
+            }
+        }
+
         // This refers to the number of attributes a given node has within the
         // context of the pathfinder searchspace
-        private static const short NUM_OF_ELEMENTS = 5;
+        private static readonly short NUM_OF_ELEMENTS = 5;
         // These are constants for indexing in the searchSpace array
-        private static const short G_SCORE_INDEX = 0;
-        private static const short H_SCORE_INDEX = 1;
-        private static const short PARENT_INDEX = 2;
-        private static const short NODE_TYPE_INDEX = 3;
-        private static const short LIST_INDEX = 4;
+        private static readonly short G_SCORE_INDEX = 0;
+        private static readonly short H_SCORE_INDEX = 1;
+        private static readonly short PARENT_INDEX = 2;
+        private static readonly short NODE_TYPE_INDEX = 3;
+        private static readonly short LIST_INDEX = 4;
         // These are used to differentiate node types
-        private static const short END_NODE = -1;
-        private static const short NORMAL_NODE = 0;
-        private static const short START_NODE = 1;
+        private static readonly short END_NODE = -1;
+        private static readonly short NORMAL_NODE = 0;
+        private static readonly short START_NODE = 1;
         // Used to differentiate lists
-        private static const short CLOSED_LIST = -1;
-        private static const short NOT_LISTED = 0;
-        private static const short OPEN_LIST = 1;
+        private static readonly short CLOSED_LIST = -1;
+        private static readonly short NOT_LISTED = 0;
+        private static readonly short OPEN_LIST = 1;
+
         // This is the search space used to undergo the pathfinding algorithm
         // within. The first and second indexes are the Y and X coordinates
         // coorosponding to the dungeon map, respectively, and the last is the
@@ -101,7 +153,7 @@ namespace NRH5Roguelike.Utility
         //                         CLOSED_LIST == closed list ,
         //                         OPEN_LIST == open list , 
         //                         NOT_LISTED == not listed)
-        private static short[][][] searchSpace;
+        private static short[,,] searchSpace;
 
         // Name: pathfind
         // Description: Takes several parameters and returns a struct
@@ -140,20 +192,27 @@ namespace NRH5Roguelike.Utility
         // Returns: An instance of a PathfindData struct that carries both the
         //          length of the calculated path, and the direction in which
         //          the first step of the path begins
-        public static PathfindData pathfind( Entity.Monster monster,
-            Dungeon.DungeonLevel level , short startXCoord , short startYCoord , 
+        public static PathfindData pathfind( Monster monster,
+            DungeonLevel level , short startXCoord , short startYCoord , 
             short endXCoord , short endYCoord , short searchDistance = 0 , 
             bool guesspath = false , byte algorithmToUse = 0 )
         {
             // Determine if the map we're searching on is larger in some way
             // than the searchspace previously defined
-            if ( Pathfinder.searchSpace.Length < level.getHeight() ||
-                Pathfinder.searchSpace[0].Length < level.getWidth() )
+            if ( Pathfinder.searchSpace.GetLength(0) < level.getDungeonHeight() ||
+                Pathfinder.searchSpace.GetLength(1) < level.getDungeonWidth() )
             {
                 Pathfinder.searchSpace = 
-                    new short[level.getHeight()][level.getWidth()]
-                        [NUM_OF_ELEMENTS];
+                    new short[level.getDungeonHeight() , 
+                        level.getDungeonWidth() , NUM_OF_ELEMENTS];
             }
+            else
+            {
+                clearSearchSpace();
+            }
+
+
+
             // Temp code for compilation
             return new PathfindData( (byte) Direction.NORTH, 0 );
         }
@@ -168,15 +227,16 @@ namespace NRH5Roguelike.Utility
         //              array is the more efficient system
         private static void clearSearchSpace()
         {
-            for ( short y = 0; y < Pathfinder.searchSpace.Length; y++ )
+            for ( short y = 0; y < Pathfinder.searchSpace.GetLength(0); y++ )
             {
-                for (short x = 0; x < Pathfinder.searchSpace[y].Length; x++)
+                for (short x = 0; x < Pathfinder.searchSpace.GetLength(1); x++)
                 {
-                    Pathfinder.searchSpace[y][x][LIST_INDEX] = NOT_LISTED;
+                    Pathfinder.searchSpace[y , x , LIST_INDEX] = NOT_LISTED;
                 }
             }
         }
     }
+
     // Name: PathfindData
     // Description: Is constructed with data pertaining to the result of a 
     //              pathfind operation
@@ -196,6 +256,7 @@ namespace NRH5Roguelike.Utility
         public readonly byte directionOfPath;
         public readonly short lengthOfPath;
     }
+
     // Name: Direction
     // Description: Describes a tile direction, where NORTH is 0 and the values
     //              thereafter are the value previous plus 1. NORTHEAST is 1.

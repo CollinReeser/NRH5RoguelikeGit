@@ -22,7 +22,7 @@ namespace NRH5Roguelike
 {
     class RoguelikeMain
     {
-        static void Main(string[] args)
+        static void Main1(string[] args)
         {
             Console.WriteLine("Hello World!");
             Console.WriteLine( "Seriously even!" );
