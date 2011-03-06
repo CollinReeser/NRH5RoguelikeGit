@@ -49,6 +49,7 @@ namespace NRH5Roguelike.Dungeon
             END_WALLS ,
             START_FLOORS ,
             GREY_STONE_FLOOR ,
+            SAND_FLOOR,
             END_FLOORS
         }
         // This is a massive string[] that holds all of the the string
@@ -63,6 +64,7 @@ namespace NRH5Roguelike.Dungeon
             "END_WALLS" ,
             "START_FLOORS" ,
             "a grey stone floor" ,
+            "a sandy floor",
             "END_FLOORS"
             
         };
