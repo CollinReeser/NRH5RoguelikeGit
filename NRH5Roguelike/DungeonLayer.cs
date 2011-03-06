@@ -8,10 +8,11 @@
 // Log:
 // - Added the getHeight and getWidth methods for use with the pathfinder, and
 //   added the 2D array itself in its most basic form
+// - Added a couple accessors and a couple query methods, in the process of
+//   slowly implementing this class
 // 
 // TODO:
-// - Add the helper methods and whatnot to query data about the dungeon or
-//   modify it
+// - Continue to implement the class
 //
 
 using System;
@@ -63,6 +64,16 @@ namespace NRH5Roguelike.Dungeon
         public int getWidth()
         {
             return dungeon.GetLength(1);
+        }
+
+        // Name: getTile
+        // Descrption: Gets the tile at the provided x and y coordinates
+        // Parameters: short xCoord , the x coordinate of the desired tile
+        //             short yCoord , the y coordinate of the desired tile
+        // Returns: The DungeonTiles enum vale for the tile at those coords
+        public short getTile(short xCoord, short yCoord)
+        {
+            return dungeon[yCoord, xCoord];
         }
 
         // Name: fillDefaultFloor

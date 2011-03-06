@@ -51,6 +51,9 @@
 // Contributors:
 // Log:
 // - Heavy documentation. Begin skeleton of methods needed
+// - Complete skeleton except for the open list heap. Began a unit test to be
+//   used for pathfind testing. It also demonstrates beautifully well behaved
+//   and cooperative code between different parts of the emerging framework
 //
 // TODO:
 // - Implement algorithm
@@ -105,14 +108,14 @@ namespace NRH5Roguelike.Utility
             // Create dungeon objects eventually to be used for pathfinding test
             Monster monster = new Monster();
             DungeonLevel dungeon = new DungeonLevel(TCODConsole.root);
+            dungeon.addMonsterToDungeon(monster);
             // While the user has not closed the window and while the user has
             // not pressed escape, do stuff
-            while ( !TCODConsole.isWindowClosed() && Key.KeyCode != 
-                TCODKeyCode.Escape )
+            while ( !TCODConsole.isWindowClosed() )
             {
-                Key = TCODConsole.waitForKeypress(true);
                 dungeon.printToScreen();
                 TCODConsole.flush();
+                dungeon.doAction();
             }
         }
 

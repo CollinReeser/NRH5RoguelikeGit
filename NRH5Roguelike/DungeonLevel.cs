@@ -11,6 +11,8 @@
 // Contributors:
 // Log:
 // - Created skeleton for use as an existent entity with the pathfinder.
+// - Added several helper methods, implemented the screen printer, and added
+//   some temp code for testing
 //
 // TODO:
 // - Fill out all the layers involved in the dungeon
@@ -19,6 +21,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using NRH5Roguelike.Entity;
 using libtcod;
 
 namespace NRH5Roguelike.Dungeon
@@ -26,7 +29,9 @@ namespace NRH5Roguelike.Dungeon
 	class DungeonLevel
 	{
         // This is the dungeon layer of this dungeon level
-        DungeonLayer dungeonLayer;
+        internal DungeonLayer dungeonLayer;
+        // This is the monster layer of this dungeon level
+        internal MonsterLayer monsterLayer;
         // This is the reference to the root console for drawing
         private readonly TCODConsole console;
         // Name: DungeonLevel (constructor)
@@ -34,6 +39,10 @@ namespace NRH5Roguelike.Dungeon
         public DungeonLevel( TCODConsole console )
         {
             dungeonLayer = new DungeonLayer( console );
+            monsterLayer = new MonsterLayer( console );
+            // Temp Code
+            monsterLayer.DungeonLevel = this;
+            // End temp code
             this.console = console;
         }
 
@@ -57,6 +66,29 @@ namespace NRH5Roguelike.Dungeon
         public int getDungeonWidth()
         {
             return dungeonLayer.getWidth();
+        }
+
+        // Name: addMonsterToDungeon
+        // Description: Takes a Monster reference and adds it to the Monster
+        //              Layer of this dungeon level. For now the location is
+        //              random, but later the randomness is limited to being
+        //              outside the scope of the LoS of the player, to maintain
+        //              belief. Also, later an overloaded version of this method
+        //              will need to exist such that spawn coordinates can be
+        //              given
+        // Parameters: Monster monster , a reference to the monster to be added
+        public void addMonsterToDungeon(Monster monster)
+        {
+            this.monsterLayer.addMonster( monster );
+        }
+
+        // Name: doAction
+        // Description: Calls the doAction method for every actor on the entire
+        //              dungeon floor. Monsters, totems, events, effects, events
+        //              layers
+        public void doAction()
+        {
+            monsterLayer.doAction();
         }
 
         // Name: printToScreen
@@ -94,6 +126,7 @@ namespace NRH5Roguelike.Dungeon
         public void printToScreen()
         {
             dungeonLayer.printToScreen();
+            monsterLayer.printToScreen();
         }
 
         // Name: printDungeonToConsole

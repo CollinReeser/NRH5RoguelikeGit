@@ -6,6 +6,9 @@
 // Contributors:
 // Log:
 // - Started the enum and string array
+// - Changed the enum to shorts to save 50% of the memory used (default is int).
+//   In addition, modified the way the enum can be used in order to improve
+//   efficiency and readability and usability
 //
 // TODO:
 // - Completely fill the enum and array, and ensure they match up
@@ -34,12 +37,19 @@ namespace NRH5Roguelike.Dungeon
         // fine. Try to keep tiles that will have the same ASCII code next to
         // eachother so that implementing getASCIICode will be easier. Walls all
         // next to eachother, similar floor tiles next to eachother, altars next
-        // to eachother, etcetera
-        public enum DungeonTiles
+        // to eachother, etcetera. Keep all similar tiles within the confines of
+        // the start and end descriptors for their type. That way, referring to
+        // ALL walls or ALL floors, etcetera, is a matter of confining a value
+        // to x > start && x < end
+        public enum DungeonTiles :short
         {
-            SUPER_STONE,
+            START_WALLS ,
+            SUPER_STONE ,
             GREY_STONE_WALL ,
-            GREY_STONE_FLOOR
+            END_WALLS ,
+            START_FLOORS ,
+            GREY_STONE_FLOOR ,
+            END_FLOORS
         }
         // This is a massive string[] that holds all of the the string
         // representations for each of these possible dungeon tile features. The
@@ -47,9 +57,13 @@ namespace NRH5Roguelike.Dungeon
         // numbers, and the DungeonTilesDesc array refers to descriptions
         public static readonly string[] DungeonTilesDesc = new string[]
         {
+            "START_WALLS" ,
             "a very strong stone wall" ,
             "a grey stone wall" ,
-            "a grey stone floor"
+            "END_WALLS" ,
+            "START_FLOORS" ,
+            "a grey stone floor" ,
+            "END_FLOORS"
             
         };
 
@@ -60,14 +74,14 @@ namespace NRH5Roguelike.Dungeon
         // Returns: A char that is the ASCII code representation of the enum val
         public static char getASCIICode(short dungeonTilesValue)
         {
-            if (dungeonTilesValue >= (short) DungeonTiles.SUPER_STONE &&
-                dungeonTilesValue <= (short) DungeonTiles.GREY_STONE_WALL)
+            if (dungeonTilesValue > (short) DungeonTiles.START_WALLS &&
+                dungeonTilesValue < (short) DungeonTiles.END_WALLS)
             {
                 // Return the wall character, octothorp
                 return '#';
             }
-            else if (dungeonTilesValue >= (short)DungeonTiles.GREY_STONE_FLOOR
-                && dungeonTilesValue <= (short)DungeonTiles.GREY_STONE_FLOOR)
+            else if (dungeonTilesValue > (short)DungeonTiles.START_FLOORS &&
+                dungeonTilesValue < (short)DungeonTiles.END_FLOORS)
             {
                 // Up for argument what the default floor tile will be, but for
                 // now it is period
