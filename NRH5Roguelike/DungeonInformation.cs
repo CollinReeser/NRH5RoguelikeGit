@@ -46,10 +46,12 @@ namespace NRH5Roguelike.Dungeon
             START_WALLS ,
             SUPER_STONE ,
             GREY_STONE_WALL ,
+            ACID_WALL,
             END_WALLS ,
             START_FLOORS ,
             GREY_STONE_FLOOR ,
             SAND_FLOOR,
+            CLOUD_FLOOR,
             END_FLOORS
         }
         // This is a massive string[] that holds all of the the string
@@ -61,10 +63,12 @@ namespace NRH5Roguelike.Dungeon
             "START_WALLS" ,
             "a very strong stone wall" ,
             "a grey stone wall" ,
+            "a wall covered in acid, dangerous to touch",
             "END_WALLS" ,
             "START_FLOORS" ,
             "a grey stone floor" ,
             "a sandy floor",
+            "a floor that looks so soft you could sleep forever",
             "END_FLOORS"
             
         };
