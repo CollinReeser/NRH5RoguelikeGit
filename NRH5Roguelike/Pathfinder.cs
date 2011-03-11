@@ -107,6 +107,8 @@ namespace NRH5Roguelike.Utility
             TCODKey Key = TCODConsole.checkForKeypress();
             // Create dungeon objects eventually to be used for pathfinding test
             Monster monster = new Monster();
+            // Set the bit for isPlayer in the bitfield
+            monster.setFlag(Monster.AttributeFlags.isPlayer);
             DungeonLevel dungeon = new DungeonLevel(TCODConsole.root);
             dungeon.addMonsterToDungeon(monster);
             // While the user has not closed the window and while the user has

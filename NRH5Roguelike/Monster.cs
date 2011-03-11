@@ -11,6 +11,10 @@
 // - Added several accessors and modifiers for data, and added an upwards
 //   reference to the list the monster is contained within. This may all be temp
 //   code if a different implementation strategy is decided upon
+// - Added a bitfield enum to be used for all the boolean attributes a monster
+//   can have, such as canSeeInvisible. Wrote a few accessor and modifier
+//   methods to check the status of the bitfield against passed flags. Updated
+//   test code against this new framework
 //
 // TODO:
 // - Determine what system of Monster implementation we're going to go with, and
@@ -27,6 +31,19 @@ namespace NRH5Roguelike.Entity
 {
 	class Monster
 	{
+        // This is a massive enum that represents the constants for the 
+        // attributes variable
+        [FlagsAttribute]
+        public enum AttributeFlags : ulong
+        {
+            // No flags are set
+            none = 0x0 ,
+            // This flag, when on, signifies that the player playing the game
+            // gets to choose the next move for this monster. Typically only one
+            // monster has this attribute on, but in the case of certain spells
+            // this can change
+            isPlayer = 0x1
+        }
         // Data members
 
         // The "name" of the monster, such that status messages print along the
@@ -44,17 +61,14 @@ namespace NRH5Roguelike.Entity
         // This is the base speed of the monster, where potions, spells, and
         // attribute gains add to or subtract from this value. LOWER IS BETTER
         private int baseSpeed;
-        // This boolean, when true, signifies that the player playing the game
-        // gets to choose the next move for this monster. Typically only one
-        // monster has this attribute as true, but in the case of certain spells
-        // this can change
-        private bool isPlayer;
         // Just a constant to be used for keyboard input for monsters the plaer
         // controls
         private static TCODKey key = new TCODKey();
         // This is an upwards reference to the MonsterLayer the monster is
         // contained within
         private MonsterLayer monsterLayer;
+        // This long holds all of the boolean attribute variables of the monster
+        private AttributeFlags attributes;
 
         // Queries
 
@@ -98,7 +112,7 @@ namespace NRH5Roguelike.Entity
         //              make his action
         public void doAction()
         {
-            if (!isPlayer)
+            if ( !isFlagSet(AttributeFlags.isPlayer) )
             {
             }
             else
@@ -205,20 +219,69 @@ namespace NRH5Roguelike.Entity
             }
         }
 
-        // Name: IsPlayer (accessor)
-        // Description: Provides the accessor and mutator for the isPlayer data
-        //              member
-        public bool IsPlayer
+        // Bitfield attribute accessors and mutators
+
+        // Name: setFlag
+        // Description: Sets the bit in the bitfield with the given flag
+        // Parameters: AttributeFlags flag , the flag being set
+        public void setFlag(AttributeFlags flag)
         {
-            get
-            {
-                return isPlayer;
-            }
-            set
-            {
-                isPlayer = value;
-            }
+            // ORing the flag into the bitfield will always set the flag:
+            //    0100101
+            //  | 0000010  <-- Flag
+            //    -------
+            //    0100111  <-- Bit is set
+            // or, alternatively;
+            //    0100111
+            //  | 0000010  <-- Flag
+            //    -------
+            //    0100111  <-- Bit is set
+            attributes |= flag;
         }
+
+        // Name: clearFlag
+        // Description: Unsets the bit designated by an AttributesFlag flag
+        // Parameters: AttributesFlags flag , the flag to unset
+        public void clearFlag(AttributeFlags flag)
+        {
+            // NOTing the flag, then ANDing it into the bitfield will always
+            // unset the bit:
+            //    0000010  <-- Flag
+            //    1111101  <-- NOT Flag
+            //
+            //    0100101
+            //  & 1111101  <-- NOT Flag
+            //    -------
+            //    0100101  <-- Bit unset
+            // or, alternatively;
+            //    0100111
+            //  & 1111101  <-- NOT Flag
+            //    -------
+            //    0100101  <-- Bit unset
+            attributes &= ~flag;
+        }
+
+        // Name: isFlagSet
+        // Description: Checks to see if the given flag is set in attributes
+        // Parameters: AttributeFlags flag , the flag being checked
+        // Returns: bool , whether the flag is set
+        public bool isFlagSet(AttributeFlags flag)
+        {
+            // If the bit for the given flag is set, ANDing the flag into the
+            // bitfield should yield the flag, otherwise the AND will not yield
+            // the flag:
+            //    0100101
+            //  & 0000010  <-- Flag
+            //    -------
+            //    0000000 != 0000010 <-- Bit was not set
+            // Or, alternatively;
+            //    0100111
+            //  & 0000010  <-- Flag
+            //    -------
+            //    0000010 == 0000010 <-- Bit was set
+            return (attributes & flag) == flag;
+        }
+
         // Name: MonsterLayer (accessor)
         // Description: Provides the accessor and mutator for the MonsterLayer
         //              data member

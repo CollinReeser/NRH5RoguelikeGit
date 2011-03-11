@@ -57,7 +57,6 @@ namespace NRH5Roguelike.Dungeon
             monster.YCoord = 10;
             monster.Color = TCODColor.white;
             monster.ASCIICode = (short)('@');
-            monster.IsPlayer = true;
             monster.MonsterLayer = this;
             // End temp code
             monsterLayer.Add(monster);
