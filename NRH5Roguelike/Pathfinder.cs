@@ -11,7 +11,7 @@
 //              that all data needed to provide a pathfinding solution will be
 //              passed to a static method. While this will require a bit of
 //              up-front work for those who use the pathfinder, in filling in
-//              all of the parameters, it will save time in !constantly creating
+//              all of the parameters, it will save time in constantly creating
 //              and destroying pathfinder objects. If this strategy proves too
 //              inconvenient, it shall be possible to change. The information
 //              the pathfinder must have access to is a reference to the Monster
@@ -119,8 +119,55 @@ namespace NRH5Roguelike.Utility
                 TCODConsole.flush();
                 dungeon.doAction();
             }
+            NodeHeap.initializePathfindList(dungeon);
+            NodeHeap.pushNode(new PathfindTile(0,0,10));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 15));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 20));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 25));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 5));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 4));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 8));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 12));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 16));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 20));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 1));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 30));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 11));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 29));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pushNode(new PathfindTile(0, 0, 6));
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
         }
-
+        public static readonly short ARB_HIGH = 30000;
         // This refers to the number of attributes a given node has within the
         // context of the pathfinder searchspace
         private static readonly short NUM_OF_ELEMENTS = 5;
@@ -204,8 +251,9 @@ namespace NRH5Roguelike.Utility
         {
             // Determine if the map we're searching on is larger in some way
             // than the searchspace previously defined
-            if ( Pathfinder.searchSpace.GetLength(0) < level.getDungeonHeight() ||
-                Pathfinder.searchSpace.GetLength(1) < level.getDungeonWidth() )
+            if ( Pathfinder.searchSpace.GetLength(0) < level.getDungeonHeight() 
+                || Pathfinder.searchSpace.GetLength(1) < 
+                level.getDungeonWidth() )
             {
                 Pathfinder.searchSpace = 
                     new short[level.getDungeonHeight() , 
@@ -261,6 +309,20 @@ namespace NRH5Roguelike.Utility
         public readonly byte directionOfPath;
         public readonly short lengthOfPath;
     }
+    // Used to hold pathfind data points
+    struct PathfindTile
+    {
+        public short xCoord;
+        public short yCoord;
+        // Arbitrarily high value for initialization
+        public short fScore;
+        public PathfindTile(short xCoord, short yCoord, short fScore)
+        {
+            this.xCoord = xCoord;
+            this.yCoord = yCoord;
+            this.fScore = fScore;
+        }
+    }
 
     // Name: Direction
     // Description: Describes a tile direction, where NORTH is 0 and the values
@@ -269,5 +331,144 @@ namespace NRH5Roguelike.Utility
     {
         NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST,
         NORTHWEST
+    }
+
+    // This is a class that shall organize the nodes of the pathfinder so that
+    // the next best node is always kept at the top of the list
+    static class NodeHeap
+    {
+        // An array used to hold the data points. Preliminarily holds enough
+        // for the whole goddam map worth of tiles
+        private static PathfindTile[] pathfindList;
+        // End of list tracker. Holds value of first empty spot
+        private static short endTracker = 0;
+        // Keep track of node currently being perculated up
+        private static short perculationNode = -1;
+        // Initialize the pathfind list
+        public static void initializePathfindList( DungeonLevel level )
+        {
+            // If it isn't null and is not the right size, resize and initialize
+            if (pathfindList != null && pathfindList.Length !=
+                (level.getDungeonWidth() - 1) * (level.getDungeonHeight() - 1))
+            {
+                pathfindList = new PathfindTile[(level.getDungeonWidth() - 1) *
+                    (level.getDungeonHeight() - 1)];
+                for (short i = 0; i < pathfindList.Length; i++)
+                {
+                    pathfindList[i] = new PathfindTile(-1, -1,
+                        Pathfinder.ARB_HIGH);
+                }
+                endTracker = 0;
+            }
+            // If it was null, create and initialize
+            else
+            {
+                pathfindList = new PathfindTile[(level.getDungeonWidth() - 1) *
+                    (level.getDungeonHeight() - 1)];
+                for (short i = 0; i < pathfindList.Length; i++)
+                {
+                    pathfindList[i] = new PathfindTile(-1, -1,
+                        Pathfinder.ARB_HIGH);
+                }
+                endTracker = 0;
+            }
+        }
+        // Add a node to the list
+        public static void pushNode(PathfindTile newTile)
+        {
+            // Put the new tile at the end of the list. It will be perculated
+            // up in a smidge
+            pathfindList[endTracker] = newTile;
+            // Update the official end of the list
+            endTracker++;
+            // Perculate the new node up
+            perculationNode = (short)(endTracker - 1);
+            // Continue to perculate up while this method returns that
+            // perculation must continue
+            while (perculateUp((short)(perculationNode)))
+            {
+            }
+        }
+        // Pull the top node: Remove it from the list and return it
+        public static PathfindTile pullRoot()
+        {
+            // Save the root for later
+            PathfindTile root = pathfindList[0];
+            // Set the root to be the very last entry in the list
+            pathfindList[0] = pathfindList[--endTracker];
+            // Clear what was the last entry to be "nothing"
+            pathfindList[endTracker].fScore = Pathfinder.ARB_HIGH;
+            // Perculate down the new "root"
+            perculateDown(0);
+            return root;
+        }
+        // A method that attempts to perculate a given node downward if it
+        // needs to be
+        private static void perculateDown(short node)
+        {
+            // If child is valid, less than current node, and less than other
+            // child, swap
+            if (node * 2 + 1 < endTracker && pathfindList[node * 2 + 1].fScore <
+                pathfindList[node].fScore && pathfindList[node * 2 + 1].fScore <
+                pathfindList[node * 2 + 2].fScore)
+            {
+                swap((short)(node * 2 + 1), node);
+                perculateDown((short)(node * 2 + 1));
+            }
+            // If child exists, and is less than current node, swap
+            else if (node * 2 + 2 < endTracker && 
+                pathfindList[node * 2 + 2].fScore < pathfindList[node].fScore)
+            {
+                swap((short)(node * 2 + 2), node);
+                perculateDown((short)(node * 2 + 2));
+            }
+        }
+        // Takes a node and attempts to perculate it up, returning true if
+        // perculation needs to continue, false otherwise
+        private static bool perculateUp(short node)
+        {
+            // If we aren't the root node, then...
+            if (perculationNode != 0)
+            {
+                // Calculate the parent of this node
+                short parent = (perculationNode % 2 == 0) ?
+                    ((short)((perculationNode >> 1) - 1)) :
+                    (short)(perculationNode >> 1);
+                // Determine if the parent is larger
+                if (pathfindList[parent].fScore > pathfindList[node].fScore)
+                {
+                    // If it is, swap with the parent, and update the static
+                    // perculationNode variable to refer to this new spot, so
+                    // that when thios method is called again, the new location
+                    // will be attempted to be perculated up
+                    swap(parent, node);
+                    perculationNode = parent;
+                    // If the new spot is the root node, we are done, otherwise
+                    // we must continue
+                    if (perculationNode != 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+            // If we reached here then the perculation process is done
+            return false;
+        }
+        // Basic swap method for swapping two array values if the pathfindList
+        private static void swap(short node1, short node2)
+        {
+            PathfindTile temp = pathfindList[node1];
+            pathfindList[node1] = pathfindList[node2];
+            pathfindList[node2] = temp;
+        }
+        // Helper method for debugging
+        public static void printNodeHeap()
+        {
+            for (int i = 0; i < 15; i++)
+            {
+                Console.Write(pathfindList[i].fScore + " ");
+            }
+            Console.WriteLine();
+        }
     }
 }
