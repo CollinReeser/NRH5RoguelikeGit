@@ -78,7 +78,7 @@ namespace NRH5Roguelike.Utility
         //              optimal input data, but handles gracefully bad input
         //              data, and does it all in an extremely efficient, 
         //              optimized, sexy-speedy manner
-        static void Main( string[] args )
+        static void Main(string[] args)
         {
             // Define constants for the size of the window so that window-
             //dependant things can be easily updated
@@ -113,14 +113,14 @@ namespace NRH5Roguelike.Utility
             dungeon.addMonsterToDungeon(monster);
             // While the user has not closed the window and while the user has
             // not pressed escape, do stuff
-            while ( !TCODConsole.isWindowClosed() )
+            while (!TCODConsole.isWindowClosed())
             {
                 dungeon.printToScreen();
                 TCODConsole.flush();
                 dungeon.doAction();
             }
             NodeHeap.initializePathfindList(dungeon);
-            NodeHeap.pushNode(new PathfindTile(0,0,10));
+            NodeHeap.pushNode(new PathfindTile(0, 0, 10));
             NodeHeap.printNodeHeap();
             NodeHeap.pushNode(new PathfindTile(0, 0, 15));
             NodeHeap.printNodeHeap();
@@ -166,15 +166,36 @@ namespace NRH5Roguelike.Utility
             NodeHeap.printNodeHeap();
             NodeHeap.pullRoot();
             NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            Console.WriteLine(NodeHeap.isHeapEmpty());
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            Console.WriteLine(NodeHeap.isHeapEmpty());
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            Console.WriteLine(NodeHeap.isHeapEmpty());
+            NodeHeap.pullRoot();
+            NodeHeap.printNodeHeap();
+            Console.WriteLine(NodeHeap.isHeapEmpty());
         }
         public static readonly short ARB_HIGH = 30000;
         // This refers to the number of attributes a given node has within the
         // context of the pathfinder searchspace
-        private static readonly short NUM_OF_ELEMENTS = 5;
+        private static readonly short NUM_OF_ELEMENTS = 6;
         // These are constants for indexing in the searchSpace array
         private static readonly short G_SCORE_INDEX = 0;
         private static readonly short H_SCORE_INDEX = 1;
-        private static readonly short PARENT_INDEX = 2;
+        private static readonly short PARENT_INDEX_X = 2;
+        private static readonly short PARENT_INDEX_Y = 5;
         private static readonly short NODE_TYPE_INDEX = 3;
         private static readonly short LIST_INDEX = 4;
         // These are used to differentiate node types
@@ -185,6 +206,22 @@ namespace NRH5Roguelike.Utility
         private static readonly short CLOSED_LIST = -1;
         private static readonly short NOT_LISTED = 0;
         private static readonly short OPEN_LIST = 1;
+        // Used as a testibly modifiable value for the H-Score incrementation
+        // amount, variable based on the prettiness of the resultant path
+        static readonly short H_SCORE_CONSTANT = 10;
+        // Used to hold the end location so that it isn't passed between method
+        // calls unnecessarily
+        private static short currentEndXCoord;
+        private static short currentEndYCoord;
+        // Static reference to the dungeon level to be used
+        private static DungeonLevel level;
+        // Static reference to the pathfinding monster
+        private static Monster monster;
+        // Static temp vars for holding calulated heuristics and G-scores, so
+        // that millions of cycles aren't wasted just creating these variables
+        // constantly
+        private static short tempH;
+        private static short tempG;
 
         // This is the search space used to undergo the pathfinding algorithm
         // within. The first and second indexes are the Y and X coordinates
@@ -205,7 +242,7 @@ namespace NRH5Roguelike.Utility
         //                         CLOSED_LIST == closed list ,
         //                         OPEN_LIST == open list , 
         //                         NOT_LISTED == not listed)
-        private static short[,,] searchSpace;
+        private static short[, ,] searchSpace;
 
         // Name: pathfind
         // Description: Takes several parameters and returns a struct
@@ -244,30 +281,217 @@ namespace NRH5Roguelike.Utility
         // Returns: An instance of a PathfindData struct that carries both the
         //          length of the calculated path, and the direction in which
         //          the first step of the path begins
-        public static PathfindData pathfind( Monster monster,
-            DungeonLevel level , short startXCoord , short startYCoord , 
-            short endXCoord , short endYCoord , short searchDistance = 0 , 
-            bool guesspath = false , byte algorithmToUse = 0 )
+        public static PathfindData pathfind(Monster monster,
+            DungeonLevel level, short startXCoord, short startYCoord,
+            short endXCoord, short endYCoord, short searchDistance = 0,
+            bool guesspath = false, byte algorithmToUse = 0)
         {
             // Determine if the map we're searching on is larger in some way
             // than the searchspace previously defined
-            if ( Pathfinder.searchSpace.GetLength(0) < level.getDungeonHeight() 
-                || Pathfinder.searchSpace.GetLength(1) < 
-                level.getDungeonWidth() )
+            if (Pathfinder.searchSpace.GetLength(0) < level.getDungeonHeight()
+                || Pathfinder.searchSpace.GetLength(1) <
+                level.getDungeonWidth())
             {
-                Pathfinder.searchSpace = 
-                    new short[level.getDungeonHeight() , 
-                        level.getDungeonWidth() , NUM_OF_ELEMENTS];
+                Pathfinder.searchSpace =
+                    new short[level.getDungeonHeight(),
+                        level.getDungeonWidth(), NUM_OF_ELEMENTS];
             }
             else
             {
                 clearSearchSpace();
             }
-
-
+            // Initialize the static end coordinates
+            currentEndXCoord = endXCoord;
+            currentEndYCoord = endYCoord;
+            // Set the start and end nodes in the searchSpace
+            searchSpace[startYCoord, startXCoord, NODE_TYPE_INDEX] = START_NODE;
+            searchSpace[endYCoord, endXCoord, NODE_TYPE_INDEX] = END_NODE;
+            Pathfinder.level = level;
+            Pathfinder.monster = monster;
+            // Create the first tile, to represent the start tile. The F-Score
+            // is a G-Score of 0 (start node), and the full heuristic
+            PathfindTile currentTile =
+                new PathfindTile(startXCoord, startYCoord,
+                /*0 +*/ calcHeuristic(startXCoord, startYCoord));
+            // Do while we are not currently exploring the end node and there is
+            // more in the list
+            do
+            {
+                // Add the tile to the closed list
+                searchSpace[currentTile.yCoord, currentTile.xCoord,
+                    LIST_INDEX] = CLOSED_LIST;
+                // Expand the node to explore its neighbors
+                expandNode(currentTile);
+                // Pull the root tile, which should be the most optimal tile
+                // to explore next
+                currentTile = NodeHeap.pullRoot();
+            } while (searchSpace[currentTile.yCoord, currentTile.xCoord,
+                NODE_TYPE_INDEX] != END_NODE && !NodeHeap.isHeapEmpty());
 
             // Temp code for compilation
-            return new PathfindData( (byte) Direction.NORTH, 0 );
+            return new PathfindData((byte)Direction.NORTH, 0);
+        }
+
+        // Name: expandNode
+        // Description: Does most of the heavy lifting of the algorithm. Takes
+        //              a node and pushes all the viable neighbors into the
+        //              sorted open list complete with calculated F-Score, as
+        //              well as updating the 3D array with those nodes and their
+        //              information
+        // Parameters: PathfindTile node , the node to be expanded
+        private static void expandNode(PathfindTile node)
+        {
+            // For each direction, we must check that a node was not already
+            // explored, then that it is walkable, and then finally add it to
+            // the open list
+            // NORTH
+            if ( searchSpace[node.yCoord - 1,node.xCoord,LIST_INDEX] == 
+                NOT_LISTED && 
+                monster.isWalkable( 
+                level.dungeonLayer.getTile(node.xCoord , node.yCoord) ) )
+            {
+                // Calculcate and preserve the H and G scores for the new node
+                tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
+                    , (short)(node.xCoord)));
+                tempG = (short)
+                    (searchSpace[node.yCoord,node.xCoord,G_SCORE_INDEX] + 10);
+                // Add node to heap
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1) , 
+                    node.xCoord , (short)(tempH + tempG) ));
+                // Add to open list
+                searchSpace[node.yCoord - 1,node.xCoord,LIST_INDEX] = OPEN_LIST;
+                // Update scores
+                searchSpace[node.yCoord - 1,node.xCoord,H_SCORE_INDEX] = tempH;
+                searchSpace[node.yCoord - 1,node.xCoord,G_SCORE_INDEX] = tempG;
+                // Update parent
+                searchSpace[node.yCoord - 1,node.xCoord,PARENT_INDEX_X] = 
+                    node.xCoord;
+                searchSpace[node.yCoord - 1,node.xCoord,PARENT_INDEX_X] = 
+                    node.yCoord;
+            }
+            // If the tile is in the closed list, it means it is definitely
+            // walkable. What we need to do now is determine if from this new
+            // node, are we able to make the route shorter based on the new
+            // G-Score? The heuristic would obviously already have been computed
+            // for this node, so only the G-Score needs to be re-evaluated
+            else if ( searchSpace[node.yCoord - 1,node.xCoord,LIST_INDEX] == 
+                NOT_LISTED )
+            {
+                // Calculate what the new G-Score would be
+                tempG = (short)
+                    (searchSpace[node.yCoord,node.xCoord,G_SCORE_INDEX] + 10);
+                // If the new G-Score is better than what it was before, then
+                // update the node, add it back to the open list, and carry on
+                if ( tempG < 
+                    searchSpace[node.yCoord - 1,node.xCoord, G_SCORE_INDEX] )
+                {
+                    // Update G-Score
+                    searchSpace[node.yCoord - 1,node.xCoord, G_SCORE_INDEX] = 
+                        tempG;
+                    // Update parent
+                    searchSpace[node.yCoord - 1,node.xCoord,PARENT_INDEX_X] = 
+                        node.xCoord;
+                    searchSpace[node.yCoord - 1,node.xCoord,PARENT_INDEX_X] = 
+                        node.yCoord;
+                    // Add to open list
+                    searchSpace[node.yCoord - 1,node.xCoord,LIST_INDEX] = 
+                        OPEN_LIST;
+                    // Add node to heap
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1), 
+                        node.xCoord , 
+                        (short)(searchSpace[node.yCoord - 1,node.xCoord, 
+                        H_SCORE_INDEX] + tempG) ));
+                }
+            }
+            // NORTH EAST
+            if ()
+            {
+            }
+            // EAST
+            if ()
+            {
+            }
+            // SOUTH EAST
+            if ()
+            {
+            }
+            // SOUTH
+            if ()
+            {
+            }
+            // SOUTH WEST
+            if ()
+            {
+            }
+            // WEST
+            if ()
+            {
+            }
+            // NORTH WEST
+            if ()
+            {
+            }
+        }
+
+        // Name: calcHeuristic
+        // Description: Return an as-the-crow-flies heuristic to the end point
+        //              from the passed current location
+        // Parameters: short xCoord ,
+        //             short yCoord , the x and y coordinates of the current
+        //             node location
+        // Returns: An H-score of the heuristic
+        private static short calcHeuristic(short xCoord, short yCoord)
+        {
+            short hScore = 0;
+            bool isEnd = false;
+            // Keep looping and incrementing the hScore by a value until the
+            // end node is reached. The xCoord and yCoord values will be used
+            // as the temp values because the starting value is only needed
+            // initially
+            for (; ; )
+            {
+                // Calculate movement of x portion
+                if (xCoord < currentEndXCoord)
+                {
+                    xCoord++;
+                }
+                else if (xCoord > currentEndXCoord)
+                {
+                    xCoord--;
+                }
+                else
+                {
+                    // Here, we predict that we are at the end node. If the
+                    // y-coordinate gets changed later on, then we weren't and
+                    // this is switched back to false. If we arrive at the 
+                    // "else" condition for y as well, then we know we are at
+                    // the end node
+                    isEnd = true;
+                }
+                // Calculate movement of y portion
+                if (yCoord < currentEndYCoord)
+                {
+                    yCoord++;
+                    isEnd = false;
+                }
+                else if (yCoord > currentEndYCoord)
+                {
+                    yCoord--;
+                    isEnd = false;
+                }
+                else
+                {
+                    // If isEnd is true when we get here, then we are at the end
+                    // node and must stop
+                    if (isEnd)
+                    {
+                        break;
+                    }
+                }
+                // Increment hScore after moving the node
+                hScore += H_SCORE_CONSTANT;
+            }
+            return hScore;
         }
 
         // Name: clearSearchSpace
@@ -280,11 +504,11 @@ namespace NRH5Roguelike.Utility
         //              array is the more efficient system
         private static void clearSearchSpace()
         {
-            for ( short y = 0; y < Pathfinder.searchSpace.GetLength(0); y++ )
+            for (short y = 0; y < Pathfinder.searchSpace.GetLength(0); y++)
             {
                 for (short x = 0; x < Pathfinder.searchSpace.GetLength(1); x++)
                 {
-                    Pathfinder.searchSpace[y , x , LIST_INDEX] = NOT_LISTED;
+                    Pathfinder.searchSpace[y, x, LIST_INDEX] = NOT_LISTED;
                 }
             }
         }
@@ -298,7 +522,7 @@ namespace NRH5Roguelike.Utility
         // Name: PathfindData (constructor)
         // Description: Constructs a PathfindData struct by initializing its
         //              readonly data members
-        public PathfindData( byte directionOfPath , short lengthOfPath )
+        public PathfindData(byte directionOfPath, short lengthOfPath)
         {
             this.directionOfPath = directionOfPath;
             this.lengthOfPath = lengthOfPath;
@@ -309,7 +533,9 @@ namespace NRH5Roguelike.Utility
         public readonly byte directionOfPath;
         public readonly short lengthOfPath;
     }
-    // Used to hold pathfind data points
+
+    // Name: PathfindTile
+    // Description: Used to hold pathfind data points
     struct PathfindTile
     {
         public short xCoord;
@@ -333,8 +559,10 @@ namespace NRH5Roguelike.Utility
         NORTHWEST
     }
 
-    // This is a class that shall organize the nodes of the pathfinder so that
-    // the next best node is always kept at the top of the list
+    // Name: NodeHeap
+    // Description: This is a class that shall organize the nodes of the 
+    //              pathfinder so that the next best node is always kept at the 
+    //              top of the list
     static class NodeHeap
     {
         // An array used to hold the data points. Preliminarily holds enough
@@ -344,8 +572,12 @@ namespace NRH5Roguelike.Utility
         private static short endTracker = 0;
         // Keep track of node currently being perculated up
         private static short perculationNode = -1;
-        // Initialize the pathfind list
-        public static void initializePathfindList( DungeonLevel level )
+
+        // Name: initializePathfindList
+        // Description: Initialize the pathfind list
+        // Parameters: DungeonLevel level , the level size is needed to
+        //             initialize the pathfind heap
+        public static void initializePathfindList(DungeonLevel level)
         {
             // If it isn't null and is not the right size, resize and initialize
             if (pathfindList != null && pathfindList.Length !=
@@ -373,7 +605,12 @@ namespace NRH5Roguelike.Utility
                 endTracker = 0;
             }
         }
-        // Add a node to the list
+
+        // Name: pushNode
+        // Description: Push a node to the heap. The strategy is pushing it to
+        //              the end of the list, then perculating it up until its
+        //              parent is rightfully smaller than it is
+        // Parameters: PathfindTile newTile , the tile to be pushed to the heap
         public static void pushNode(PathfindTile newTile)
         {
             // Put the new tile at the end of the list. It will be perculated
@@ -389,21 +626,36 @@ namespace NRH5Roguelike.Utility
             {
             }
         }
-        // Pull the top node: Remove it from the list and return it
+
+        // Name: pullRoot
+        // Description: Pull the top node; Remove it from the list and return it
+        // Returns: A PathfindTile that was the root of the heap
         public static PathfindTile pullRoot()
         {
-            // Save the root for later
-            PathfindTile root = pathfindList[0];
-            // Set the root to be the very last entry in the list
-            pathfindList[0] = pathfindList[--endTracker];
-            // Clear what was the last entry to be "nothing"
-            pathfindList[endTracker].fScore = Pathfinder.ARB_HIGH;
-            // Perculate down the new "root"
-            perculateDown(0);
-            return root;
+            // NOTE
+            // This is a debugging check. Once the algorithm is correct it can
+            // be removed
+            if (endTracker != 0)
+            {
+                // Save the root for later
+                PathfindTile root = pathfindList[0];
+                // Set the root to be the very last entry in the list
+                pathfindList[0] = pathfindList[--endTracker];
+                // Clear what was the last entry to be "nothing"
+                pathfindList[endTracker].fScore = Pathfinder.ARB_HIGH;
+                // Perculate down the new "root"
+                perculateDown(0);
+                return root;
+            }
+            // Debugging return
+            return new PathfindTile(-1, -1, Pathfinder.ARB_HIGH);
         }
-        // A method that attempts to perculate a given node downward if it
-        // needs to be
+
+        // Name: perculateDown
+        // Description: A method that attempts to perculate a given node 
+        //              downward if it needs to be
+        // Parameters: short node , the index of the node that must be
+        //             perculated down
         private static void perculateDown(short node)
         {
             // If child is valid, less than current node, and less than other
@@ -416,15 +668,21 @@ namespace NRH5Roguelike.Utility
                 perculateDown((short)(node * 2 + 1));
             }
             // If child exists, and is less than current node, swap
-            else if (node * 2 + 2 < endTracker && 
+            else if (node * 2 + 2 < endTracker &&
                 pathfindList[node * 2 + 2].fScore < pathfindList[node].fScore)
             {
                 swap((short)(node * 2 + 2), node);
                 perculateDown((short)(node * 2 + 2));
             }
         }
-        // Takes a node and attempts to perculate it up, returning true if
-        // perculation needs to continue, false otherwise
+
+        // Name: perculateUp
+        // Description: Takes a node index and attempts to perculate it up, 
+        //              returning true if perculation needs to continue, false 
+        //              otherwise
+        // Parameters: short node , the index of the node to be perculated up
+        // Returns: A bool, true if perculation for that node needs to be
+        //          continued, false otherwise
         private static bool perculateUp(short node)
         {
             // If we aren't the root node, then...
@@ -454,14 +712,23 @@ namespace NRH5Roguelike.Utility
             // If we reached here then the perculation process is done
             return false;
         }
-        // Basic swap method for swapping two array values if the pathfindList
+
+        // Name: swap
+        // Description: Basic swap method for swapping two array values if the 
+        //              pathfindList
+        // Parameters: short node1 ,
+        //             short node2 , the nodes in the list to be swapped
         private static void swap(short node1, short node2)
         {
             PathfindTile temp = pathfindList[node1];
             pathfindList[node1] = pathfindList[node2];
             pathfindList[node2] = temp;
         }
-        // Helper method for debugging
+
+        // Name: printNodeHeap
+        // Description: Simple method that prints the first few values of the
+        //              list. Magic numbers exist here because the method only
+        //              exists for debugging purposes
         public static void printNodeHeap()
         {
             for (int i = 0; i < 15; i++)
@@ -469,6 +736,15 @@ namespace NRH5Roguelike.Utility
                 Console.Write(pathfindList[i].fScore + " ");
             }
             Console.WriteLine();
+        }
+
+        // Name: isHeapEmpty
+        // Description: Returns true if endTracker refers to an end that is the
+        //              beginning of the list, ie, there are no entries
+        // Returns: bool, true if the list is empty
+        public static bool isHeapEmpty()
+        {
+            return endTracker == 0;
         }
     }
 }
