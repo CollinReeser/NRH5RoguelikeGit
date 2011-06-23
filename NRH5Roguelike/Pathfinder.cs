@@ -54,9 +54,12 @@
 // - Complete skeleton except for the open list heap. Began a unit test to be
 //   used for pathfind testing. It also demonstrates beautifully well behaved
 //   and cooperative code between different parts of the emerging framework
+// - Implemented heap
+// - Implemented most of algorithm
 //
 // TODO:
-// - Implement algorithm
+// - Finish algorithm
+// - Polish
 //
 
 using System;
@@ -222,6 +225,12 @@ namespace NRH5Roguelike.Utility
         // constantly
         private static short tempH;
         private static short tempG;
+        // Static variable to hold how long the path is
+        private static short pathLength;
+        // A final temp value
+        private static short temp;
+        // Used to calculate direction of path
+        private static PathfindTile lastTile;
 
         // This is the search space used to undergo the pathfinding algorithm
         // within. The first and second indexes are the Y and X coordinates
@@ -327,7 +336,27 @@ namespace NRH5Roguelike.Utility
                 currentTile = NodeHeap.pullRoot();
             } while (searchSpace[currentTile.yCoord, currentTile.xCoord,
                 NODE_TYPE_INDEX] != END_NODE && !NodeHeap.isHeapEmpty());
-
+            // If we found the end node, then calculate a path back
+            if (searchSpace[currentTile.yCoord, currentTile.xCoord,
+                NODE_TYPE_INDEX] == END_NODE)
+            {
+                pathLength = 0;
+                while (searchSpace[currentTile.yCoord, currentTile.xCoord,
+                    NODE_TYPE_INDEX] != START_NODE)
+                {
+                    lastTile = currentTile;
+                    temp = searchSpace[currentTile.yCoord,
+                        currentTile.xCoord, PARENT_INDEX_X];
+                    currentTile.yCoord = searchSpace[currentTile.yCoord,
+                        currentTile.xCoord, PARENT_INDEX_Y];
+                    currentTile.xCoord = temp;
+                    pathLength++;
+                }
+                return new PathfindData(
+                    Pathfinder.calcDirection(currentTile.xCoord,
+                    currentTile.yCoord, lastTile.xCoord, lastTile.yCoord),
+                    pathLength);
+            }
             // Temp code for compilation
             return new PathfindData((byte)Direction.NORTH, 0);
         }
@@ -345,28 +374,31 @@ namespace NRH5Roguelike.Utility
             // explored, then that it is walkable, and then finally add it to
             // the open list
             // NORTH
-            if ( searchSpace[node.yCoord - 1,node.xCoord,LIST_INDEX] == 
-                NOT_LISTED && 
-                monster.isWalkable( 
-                level.dungeonLayer.getTile(node.xCoord , node.yCoord) ) )
+            if (searchSpace[node.yCoord - 1, node.xCoord, LIST_INDEX] ==
+                NOT_LISTED &&
+                monster.isWalkable(
+                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
             {
                 // Calculcate and preserve the H and G scores for the new node
                 tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
                     , (short)(node.xCoord)));
                 tempG = (short)
-                    (searchSpace[node.yCoord,node.xCoord,G_SCORE_INDEX] + 10);
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
                 // Add node to heap
-                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1) , 
-                    node.xCoord , (short)(tempH + tempG) ));
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
+                    node.xCoord, (short)(tempH + tempG)));
                 // Add to open list
-                searchSpace[node.yCoord - 1,node.xCoord,LIST_INDEX] = OPEN_LIST;
+                searchSpace[node.yCoord - 1, node.xCoord, LIST_INDEX] =
+                    OPEN_LIST;
                 // Update scores
-                searchSpace[node.yCoord - 1,node.xCoord,H_SCORE_INDEX] = tempH;
-                searchSpace[node.yCoord - 1,node.xCoord,G_SCORE_INDEX] = tempG;
+                searchSpace[node.yCoord - 1, node.xCoord, H_SCORE_INDEX] =
+                    tempH;
+                searchSpace[node.yCoord - 1, node.xCoord, G_SCORE_INDEX] =
+                    tempG;
                 // Update parent
-                searchSpace[node.yCoord - 1,node.xCoord,PARENT_INDEX_X] = 
+                searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord - 1,node.xCoord,PARENT_INDEX_X] = 
+                searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_X] =
                     node.yCoord;
             }
             // If the tile is in the closed list, it means it is definitely
@@ -374,62 +406,353 @@ namespace NRH5Roguelike.Utility
             // node, are we able to make the route shorter based on the new
             // G-Score? The heuristic would obviously already have been computed
             // for this node, so only the G-Score needs to be re-evaluated
-            else if ( searchSpace[node.yCoord - 1,node.xCoord,LIST_INDEX] == 
-                NOT_LISTED )
+            else if (searchSpace[node.yCoord - 1, node.xCoord, LIST_INDEX] ==
+                NOT_LISTED)
             {
                 // Calculate what the new G-Score would be
                 tempG = (short)
-                    (searchSpace[node.yCoord,node.xCoord,G_SCORE_INDEX] + 10);
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
                 // If the new G-Score is better than what it was before, then
                 // update the node, add it back to the open list, and carry on
-                if ( tempG < 
-                    searchSpace[node.yCoord - 1,node.xCoord, G_SCORE_INDEX] )
+                if (tempG <
+                    searchSpace[node.yCoord - 1, node.xCoord, G_SCORE_INDEX])
                 {
                     // Update G-Score
-                    searchSpace[node.yCoord - 1,node.xCoord, G_SCORE_INDEX] = 
+                    searchSpace[node.yCoord - 1, node.xCoord, G_SCORE_INDEX] =
                         tempG;
                     // Update parent
-                    searchSpace[node.yCoord - 1,node.xCoord,PARENT_INDEX_X] = 
+                    searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_X] =
                         node.xCoord;
-                    searchSpace[node.yCoord - 1,node.xCoord,PARENT_INDEX_X] = 
+                    searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_X] =
                         node.yCoord;
                     // Add to open list
-                    searchSpace[node.yCoord - 1,node.xCoord,LIST_INDEX] = 
+                    searchSpace[node.yCoord - 1, node.xCoord, LIST_INDEX] =
                         OPEN_LIST;
                     // Add node to heap
-                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1), 
-                        node.xCoord , 
-                        (short)(searchSpace[node.yCoord - 1,node.xCoord, 
-                        H_SCORE_INDEX] + tempG) ));
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
+                        node.xCoord,
+                        (short)(searchSpace[node.yCoord - 1, node.xCoord,
+                        H_SCORE_INDEX] + tempG)));
                 }
             }
             // NORTH EAST
-            if ()
+            if (searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX] ==
+                NOT_LISTED &&
+                monster.isWalkable(
+                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
             {
+                tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
+                    , (short)(node.xCoord + 1)));
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
+                    (short)(node.xCoord + 1), (short)(tempH + tempG)));
+                searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX] =
+                    OPEN_LIST;
+                searchSpace[node.yCoord - 1, node.xCoord + 1, H_SCORE_INDEX] =
+                    tempH;
+                searchSpace[node.yCoord - 1, node.xCoord + 1, G_SCORE_INDEX] =
+                    tempG;
+                searchSpace[node.yCoord - 1, node.xCoord + 1, PARENT_INDEX_X] =
+                    node.xCoord;
+                searchSpace[node.yCoord - 1, node.xCoord + 1, PARENT_INDEX_X] =
+                    node.yCoord;
+            }
+            else if (searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX]
+                == NOT_LISTED)
+            {
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                if (tempG <
+                    searchSpace[node.yCoord - 1, node.xCoord + 1,
+                    G_SCORE_INDEX])
+                {
+                    searchSpace[node.yCoord - 1, node.xCoord + 1, G_SCORE_INDEX]
+                        = tempG;
+                    searchSpace[node.yCoord - 1, node.xCoord + 1,
+                        PARENT_INDEX_X] = node.xCoord;
+                    searchSpace[node.yCoord - 1, node.xCoord + 1,
+                        PARENT_INDEX_X] = node.yCoord;
+                    searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX] =
+                        OPEN_LIST;
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
+                        (short)(node.xCoord + 1),
+                        (short)(searchSpace[node.yCoord - 1, node.xCoord + 1,
+                        H_SCORE_INDEX] + tempG)));
+                }
             }
             // EAST
-            if ()
+            if (searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] ==
+                NOT_LISTED &&
+                monster.isWalkable(
+                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
             {
+                tempH = (short)(calcHeuristic((short)(node.yCoord)
+                    , (short)(node.xCoord + 1)));
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord),
+                    (short)(node.xCoord + 1), (short)(tempH + tempG)));
+                searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] =
+                    OPEN_LIST;
+                searchSpace[node.yCoord, node.xCoord + 1, H_SCORE_INDEX] =
+                    tempH;
+                searchSpace[node.yCoord, node.xCoord + 1, G_SCORE_INDEX] =
+                    tempG;
+                searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_X] =
+                    node.xCoord;
+                searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_X] =
+                    node.yCoord;
+            }
+            else if (searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] ==
+                NOT_LISTED)
+            {
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                if (tempG <
+                    searchSpace[node.yCoord, node.xCoord + 1, G_SCORE_INDEX])
+                {
+                    searchSpace[node.yCoord, node.xCoord + 1, G_SCORE_INDEX] =
+                        tempG;
+                    searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_X] =
+                        node.xCoord;
+                    searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_X] =
+                        node.yCoord;
+                    searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] =
+                        OPEN_LIST;
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord),
+                        (short)(node.xCoord + 1),
+                        (short)(searchSpace[node.yCoord, node.xCoord + 1,
+                        H_SCORE_INDEX] + tempG)));
+                }
             }
             // SOUTH EAST
-            if ()
+            if (searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX] ==
+                NOT_LISTED &&
+                monster.isWalkable(
+                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
             {
+                tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
+                    , (short)(node.xCoord + 1)));
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
+                    (short)(node.xCoord + 1), (short)(tempH + tempG)));
+                searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX] =
+                    OPEN_LIST;
+                searchSpace[node.yCoord + 1, node.xCoord + 1, H_SCORE_INDEX] =
+                    tempH;
+                searchSpace[node.yCoord + 1, node.xCoord + 1, G_SCORE_INDEX] =
+                    tempG;
+                searchSpace[node.yCoord + 1, node.xCoord + 1, PARENT_INDEX_X] =
+                    node.xCoord;
+                searchSpace[node.yCoord + 1, node.xCoord + 1, PARENT_INDEX_X] =
+                    node.yCoord;
+            }
+            else if (searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX]
+                == NOT_LISTED)
+            {
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                if (tempG <
+                    searchSpace[node.yCoord + 1, node.xCoord + 1,
+                    G_SCORE_INDEX])
+                {
+                    searchSpace[node.yCoord + 1, node.xCoord + 1, G_SCORE_INDEX]
+                        = tempG;
+                    searchSpace[node.yCoord + 1, node.xCoord + 1,
+                        PARENT_INDEX_X] = node.xCoord;
+                    searchSpace[node.yCoord + 1, node.xCoord + 1,
+                        PARENT_INDEX_X] = node.yCoord;
+                    searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX] =
+                        OPEN_LIST;
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
+                        (short)(node.xCoord + 1),
+                        (short)(searchSpace[node.yCoord + 1, node.xCoord + 1,
+                        H_SCORE_INDEX] + tempG)));
+                }
             }
             // SOUTH
-            if ()
+            if (searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] ==
+                NOT_LISTED &&
+                monster.isWalkable(
+                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
             {
+                tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
+                    , (short)(node.xCoord)));
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
+                    node.xCoord, (short)(tempH + tempG)));
+                searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] =
+                    OPEN_LIST;
+                searchSpace[node.yCoord + 1, node.xCoord, H_SCORE_INDEX] =
+                    tempH;
+                searchSpace[node.yCoord + 1, node.xCoord, G_SCORE_INDEX] =
+                    tempG;
+                searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_X] =
+                    node.xCoord;
+                searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_X] =
+                    node.yCoord;
+            }
+            else if (searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] ==
+                NOT_LISTED)
+            {
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                if (tempG <
+                    searchSpace[node.yCoord + 1, node.xCoord, G_SCORE_INDEX])
+                {
+                    searchSpace[node.yCoord + 1, node.xCoord, G_SCORE_INDEX] =
+                        tempG;
+                    searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_X] =
+                        node.xCoord;
+                    searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_X] =
+                        node.yCoord;
+                    searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] =
+                        OPEN_LIST;
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
+                        node.xCoord,
+                        (short)(searchSpace[node.yCoord + 1, node.xCoord,
+                        H_SCORE_INDEX] + tempG)));
+                }
             }
             // SOUTH WEST
-            if ()
+            if (searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX] ==
+                NOT_LISTED &&
+                monster.isWalkable(
+                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
             {
+                tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
+                    , (short)(node.xCoord - 1)));
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
+                    (short)(node.xCoord - 1), (short)(tempH + tempG)));
+                searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX] =
+                    OPEN_LIST;
+                searchSpace[node.yCoord + 1, node.xCoord - 1, H_SCORE_INDEX] =
+                    tempH;
+                searchSpace[node.yCoord + 1, node.xCoord - 1, G_SCORE_INDEX] =
+                    tempG;
+                searchSpace[node.yCoord + 1, node.xCoord - 1, PARENT_INDEX_X] =
+                    node.xCoord;
+                searchSpace[node.yCoord + 1, node.xCoord - 1, PARENT_INDEX_X] =
+                    node.yCoord;
+            }
+            else if (searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX]
+                == NOT_LISTED)
+            {
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                if (tempG <
+                    searchSpace[node.yCoord + 1, node.xCoord - 1,
+                    G_SCORE_INDEX])
+                {
+                    searchSpace[node.yCoord + 1, node.xCoord - 1, G_SCORE_INDEX]
+                        = tempG;
+                    searchSpace[node.yCoord + 1, node.xCoord - 1,
+                        PARENT_INDEX_X] = node.xCoord;
+                    searchSpace[node.yCoord + 1, node.xCoord - 1,
+                        PARENT_INDEX_X] = node.yCoord;
+                    searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX] =
+                        OPEN_LIST;
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
+                        (short)(node.xCoord - 1),
+                        (short)(searchSpace[node.yCoord + 1, node.xCoord - 1,
+                        H_SCORE_INDEX] + tempG)));
+                }
             }
             // WEST
-            if ()
+            if (searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] ==
+                NOT_LISTED &&
+                monster.isWalkable(
+                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
             {
+                tempH = (short)(calcHeuristic((short)(node.yCoord)
+                    , (short)(node.xCoord - 1)));
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord),
+                    (short)(node.xCoord - 1), (short)(tempH + tempG)));
+                searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] =
+                    OPEN_LIST;
+                searchSpace[node.yCoord, node.xCoord - 1, H_SCORE_INDEX] =
+                    tempH;
+                searchSpace[node.yCoord, node.xCoord - 1, G_SCORE_INDEX] =
+                    tempG;
+                searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_X] =
+                    node.xCoord;
+                searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_X] =
+                    node.yCoord;
+            }
+            else if (searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] ==
+                NOT_LISTED)
+            {
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                if (tempG <
+                    searchSpace[node.yCoord, node.xCoord - 1, G_SCORE_INDEX])
+                {
+                    searchSpace[node.yCoord, node.xCoord - 1, G_SCORE_INDEX] =
+                        tempG;
+                    searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_X] =
+                        node.xCoord;
+                    searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_X] =
+                        node.yCoord;
+                    searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] =
+                        OPEN_LIST;
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord),
+                        (short)(node.xCoord - 1),
+                        (short)(searchSpace[node.yCoord, node.xCoord - 1,
+                        H_SCORE_INDEX] + tempG)));
+                }
             }
             // NORTH WEST
-            if ()
+            if (searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX] ==
+                NOT_LISTED &&
+                monster.isWalkable(
+                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
             {
+                tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
+                    , (short)(node.xCoord - 1)));
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
+                    (short)(node.xCoord - 1), (short)(tempH + tempG)));
+                searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX] =
+                    OPEN_LIST;
+                searchSpace[node.yCoord - 1, node.xCoord - 1, H_SCORE_INDEX] =
+                    tempH;
+                searchSpace[node.yCoord - 1, node.xCoord - 1, G_SCORE_INDEX] =
+                    tempG;
+                searchSpace[node.yCoord - 1, node.xCoord - 1, PARENT_INDEX_X] =
+                    node.xCoord;
+                searchSpace[node.yCoord - 1, node.xCoord - 1, PARENT_INDEX_X] =
+                    node.yCoord;
+            }
+            else if (searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX]
+                == NOT_LISTED)
+            {
+                tempG = (short)
+                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                if (tempG <
+                    searchSpace[node.yCoord - 1, node.xCoord - 1,
+                    G_SCORE_INDEX])
+                {
+                    searchSpace[node.yCoord - 1, node.xCoord - 1, G_SCORE_INDEX]
+                        = tempG;
+                    searchSpace[node.yCoord - 1, node.xCoord - 1,
+                        PARENT_INDEX_X] = node.xCoord;
+                    searchSpace[node.yCoord - 1, node.xCoord - 1,
+                        PARENT_INDEX_X] = node.yCoord;
+                    searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX] =
+                        OPEN_LIST;
+                    NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
+                        (short)(node.xCoord - 1),
+                        (short)(searchSpace[node.yCoord - 1, node.xCoord - 1,
+                        H_SCORE_INDEX] + tempG)));
+                }
             }
         }
 
@@ -512,26 +835,95 @@ namespace NRH5Roguelike.Utility
                 }
             }
         }
-    }
 
-    // Name: PathfindData
-    // Description: Is constructed with data pertaining to the result of a 
-    //              pathfind operation
-    public struct PathfindData
-    {
-        // Name: PathfindData (constructor)
-        // Description: Constructs a PathfindData struct by initializing its
-        //              readonly data members
-        public PathfindData(byte directionOfPath, short lengthOfPath)
+        // Name: Direction
+        // Description: Describes a tile direction, where NORTH is 0 and the 
+        //              values thereafter are the value previous plus 1. 
+        //              NORTHEAST is 1.
+        public enum Direction
         {
-            this.directionOfPath = directionOfPath;
-            this.lengthOfPath = lengthOfPath;
+            NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST,
+            NORTHWEST, INVALID
         }
-        // The data members of the PathfindData struct. They are readonly so
-        // that while they can be initialized with any data value that is
-        // desired or needed at runtime, they cannot thereafter be changed
-        public readonly byte directionOfPath;
-        public readonly short lengthOfPath;
+
+        // Name: calcDirection
+        // Descrption: Return the enum direction from one cell to the next
+        // Parameters: short x1 ,
+        //             short y1 ,
+        //             short x2 ,
+        //             short y2 , the coordinates of two cells.
+        // Returns: An enum representing the direction that the second cell is 
+        //          in in regards to the first cell
+        public static Direction calcDirection(short x1, short y1, short x2,
+            short y2)
+        {
+            if (x1 < x2)
+            {
+                if (y1 < y2)
+                {
+                    return Direction.SOUTHEAST;
+                }
+                if (y1 > y2)
+                {
+                    return Direction.NORTHEAST;
+                }
+                else
+                {
+                    return Direction.EAST;
+                }
+            }
+            else if (x1 > x2)
+            {
+                if (y1 < y2)
+                {
+                    return Direction.SOUTHWEST;
+                }
+                if (y1 > y2)
+                {
+                    return Direction.NORTHWEST;
+                }
+                else
+                {
+                    return Direction.WEST;
+                }
+            }
+            else
+            {
+                if (y1 < y2)
+                {
+                    return Direction.SOUTH;
+                }
+                if (y1 > y2)
+                {
+                    return Direction.NORTH;
+                }
+                else
+                {
+                    return Direction.INVALID;
+                }
+            }
+        }
+
+        // Name: PathfindData
+        // Description: Is constructed with data pertaining to the result of a 
+        //              pathfind operation
+        public struct PathfindData
+        {
+            // Name: PathfindData (constructor)
+            // Description: Constructs a PathfindData struct by initializing its
+            //              readonly data members
+            public PathfindData(Pathfinder.Direction directionOfPath,
+                short lengthOfPath)
+            {
+                this.directionOfPath = directionOfPath;
+                this.lengthOfPath = lengthOfPath;
+            }
+            // The data members of the PathfindData struct. They are readonly so
+            // that while they can be initialized with any data value that is
+            // desired or needed at runtime, they cannot thereafter be changed
+            public readonly Pathfinder.Direction directionOfPath;
+            public readonly short lengthOfPath;
+        }
     }
 
     // Name: PathfindTile
@@ -548,15 +940,6 @@ namespace NRH5Roguelike.Utility
             this.yCoord = yCoord;
             this.fScore = fScore;
         }
-    }
-
-    // Name: Direction
-    // Description: Describes a tile direction, where NORTH is 0 and the values
-    //              thereafter are the value previous plus 1. NORTHEAST is 1.
-    public enum Direction
-    {
-        NORTH, NORTHEAST, EAST, SOUTHEAST, SOUTH, SOUTHWEST, WEST,
-        NORTHWEST
     }
 
     // Name: NodeHeap
