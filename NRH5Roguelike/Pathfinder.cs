@@ -69,6 +69,7 @@ using System.Text;
 using libtcod;
 using NRH5Roguelike.Entity;
 using NRH5Roguelike.Dungeon;
+using System.Diagnostics;
 
 namespace NRH5Roguelike.Utility
 {
@@ -114,6 +115,23 @@ namespace NRH5Roguelike.Utility
             monster.setFlag(Monster.AttributeFlags.isPlayer);
             DungeonLevel dungeon = new DungeonLevel(TCODConsole.root);
             dungeon.addMonsterToDungeon(monster);
+
+
+            // PATHFINDING TESTS
+            Stopwatch st = new Stopwatch();
+            for (int i = 0; i < 500000; i++)
+            {
+                st.Start();
+                //Console.WriteLine(
+                pathfind(monster, dungeon, monster.XCoord, monster.YCoord,
+                (short)30,
+                (short)30);//.directionOfPath);
+                st.Stop();
+            }
+            Console.WriteLine(st.ElapsedMilliseconds/500000.0);
+            // PATHFINDING TESTS
+
+
             // While the user has not closed the window and while the user has
             // not pressed escape, do stuff
             while (!TCODConsole.isWindowClosed())
@@ -122,73 +140,6 @@ namespace NRH5Roguelike.Utility
                 TCODConsole.flush();
                 dungeon.doAction();
             }
-            NodeHeap.initializePathfindList(dungeon);
-            NodeHeap.pushNode(new PathfindTile(0, 0, 10));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 15));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 20));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 25));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 5));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 4));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 8));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 12));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 16));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 20));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 1));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 30));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 11));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 29));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pushNode(new PathfindTile(0, 0, 6));
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            Console.WriteLine(NodeHeap.isHeapEmpty());
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            Console.WriteLine(NodeHeap.isHeapEmpty());
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            Console.WriteLine(NodeHeap.isHeapEmpty());
-            NodeHeap.pullRoot();
-            NodeHeap.printNodeHeap();
-            Console.WriteLine(NodeHeap.isHeapEmpty());
         }
         public static readonly short ARB_HIGH = 30000;
         // This refers to the number of attributes a given node has within the
@@ -297,13 +248,14 @@ namespace NRH5Roguelike.Utility
         {
             // Determine if the map we're searching on is larger in some way
             // than the searchspace previously defined
-            if (Pathfinder.searchSpace.GetLength(0) < level.getDungeonHeight()
+            if (Pathfinder.searchSpace == null || 
+                Pathfinder.searchSpace.GetLength(0) < level.getDungeonHeight()
                 || Pathfinder.searchSpace.GetLength(1) <
                 level.getDungeonWidth())
             {
                 Pathfinder.searchSpace =
                     new short[level.getDungeonHeight(),
-                        level.getDungeonWidth(), NUM_OF_ELEMENTS];
+                    level.getDungeonWidth(), NUM_OF_ELEMENTS];
             }
             else
             {
@@ -317,6 +269,8 @@ namespace NRH5Roguelike.Utility
             searchSpace[endYCoord, endXCoord, NODE_TYPE_INDEX] = END_NODE;
             Pathfinder.level = level;
             Pathfinder.monster = monster;
+            // Initialize the pathfinding heap array
+            NodeHeap.initializePathfindList(level);
             // Create the first tile, to represent the start tile. The F-Score
             // is a G-Score of 0 (start node), and the full heuristic
             PathfindTile currentTile =
@@ -377,7 +331,8 @@ namespace NRH5Roguelike.Utility
             if (searchSpace[node.yCoord - 1, node.xCoord, LIST_INDEX] ==
                 NOT_LISTED &&
                 monster.isWalkable(
-                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
+                level.dungeonLayer.getTile(node.xCoord,
+                (short)(node.yCoord - 1))))
             {
                 // Calculcate and preserve the H and G scores for the new node
                 tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
@@ -398,7 +353,7 @@ namespace NRH5Roguelike.Utility
                 // Update parent
                 searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_X] =
+                searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_Y] =
                     node.yCoord;
             }
             // If the tile is in the closed list, it means it is definitely
@@ -407,7 +362,7 @@ namespace NRH5Roguelike.Utility
             // G-Score? The heuristic would obviously already have been computed
             // for this node, so only the G-Score needs to be re-evaluated
             else if (searchSpace[node.yCoord - 1, node.xCoord, LIST_INDEX] ==
-                NOT_LISTED)
+                CLOSED_LIST)
             {
                 // Calculate what the new G-Score would be
                 tempG = (short)
@@ -423,7 +378,7 @@ namespace NRH5Roguelike.Utility
                     // Update parent
                     searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_X] =
                         node.xCoord;
-                    searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_X] =
+                    searchSpace[node.yCoord - 1, node.xCoord, PARENT_INDEX_Y] =
                         node.yCoord;
                     // Add to open list
                     searchSpace[node.yCoord - 1, node.xCoord, LIST_INDEX] =
@@ -439,7 +394,8 @@ namespace NRH5Roguelike.Utility
             if (searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX] ==
                 NOT_LISTED &&
                 monster.isWalkable(
-                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
+                level.dungeonLayer.getTile((short)(node.xCoord + 1), 
+                (short)(node.yCoord - 1))))
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
                     , (short)(node.xCoord + 1)));
@@ -455,11 +411,11 @@ namespace NRH5Roguelike.Utility
                     tempG;
                 searchSpace[node.yCoord - 1, node.xCoord + 1, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord - 1, node.xCoord + 1, PARENT_INDEX_X] =
+                searchSpace[node.yCoord - 1, node.xCoord + 1, PARENT_INDEX_Y] =
                     node.yCoord;
             }
             else if (searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX]
-                == NOT_LISTED)
+                == CLOSED_LIST)
             {
                 tempG = (short)
                     (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
@@ -472,7 +428,7 @@ namespace NRH5Roguelike.Utility
                     searchSpace[node.yCoord - 1, node.xCoord + 1,
                         PARENT_INDEX_X] = node.xCoord;
                     searchSpace[node.yCoord - 1, node.xCoord + 1,
-                        PARENT_INDEX_X] = node.yCoord;
+                        PARENT_INDEX_Y] = node.yCoord;
                     searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX] =
                         OPEN_LIST;
                     NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
@@ -485,7 +441,8 @@ namespace NRH5Roguelike.Utility
             if (searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] ==
                 NOT_LISTED &&
                 monster.isWalkable(
-                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
+                level.dungeonLayer.getTile((short)(node.xCoord + 1), 
+                node.yCoord)))
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord)
                     , (short)(node.xCoord + 1)));
@@ -501,11 +458,11 @@ namespace NRH5Roguelike.Utility
                     tempG;
                 searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_X] =
+                searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_Y] =
                     node.yCoord;
             }
             else if (searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] ==
-                NOT_LISTED)
+                CLOSED_LIST)
             {
                 tempG = (short)
                     (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
@@ -516,7 +473,7 @@ namespace NRH5Roguelike.Utility
                         tempG;
                     searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_X] =
                         node.xCoord;
-                    searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_X] =
+                    searchSpace[node.yCoord, node.xCoord + 1, PARENT_INDEX_Y] =
                         node.yCoord;
                     searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] =
                         OPEN_LIST;
@@ -530,7 +487,8 @@ namespace NRH5Roguelike.Utility
             if (searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX] ==
                 NOT_LISTED &&
                 monster.isWalkable(
-                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
+                level.dungeonLayer.getTile((short)(node.xCoord + 1), 
+                (short)(node.yCoord + 1 ))))
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
                     , (short)(node.xCoord + 1)));
@@ -546,11 +504,11 @@ namespace NRH5Roguelike.Utility
                     tempG;
                 searchSpace[node.yCoord + 1, node.xCoord + 1, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord + 1, node.xCoord + 1, PARENT_INDEX_X] =
+                searchSpace[node.yCoord + 1, node.xCoord + 1, PARENT_INDEX_Y] =
                     node.yCoord;
             }
             else if (searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX]
-                == NOT_LISTED)
+                == CLOSED_LIST)
             {
                 tempG = (short)
                     (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
@@ -563,7 +521,7 @@ namespace NRH5Roguelike.Utility
                     searchSpace[node.yCoord + 1, node.xCoord + 1,
                         PARENT_INDEX_X] = node.xCoord;
                     searchSpace[node.yCoord + 1, node.xCoord + 1,
-                        PARENT_INDEX_X] = node.yCoord;
+                        PARENT_INDEX_Y] = node.yCoord;
                     searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX] =
                         OPEN_LIST;
                     NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
@@ -576,7 +534,8 @@ namespace NRH5Roguelike.Utility
             if (searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] ==
                 NOT_LISTED &&
                 monster.isWalkable(
-                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
+                level.dungeonLayer.getTile(node.xCoord, 
+                (short)(node.yCoord + 1))))
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
                     , (short)(node.xCoord)));
@@ -592,11 +551,11 @@ namespace NRH5Roguelike.Utility
                     tempG;
                 searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_X] =
+                searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_Y] =
                     node.yCoord;
             }
             else if (searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] ==
-                NOT_LISTED)
+                CLOSED_LIST)
             {
                 tempG = (short)
                     (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
@@ -607,7 +566,7 @@ namespace NRH5Roguelike.Utility
                         tempG;
                     searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_X] =
                         node.xCoord;
-                    searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_X] =
+                    searchSpace[node.yCoord + 1, node.xCoord, PARENT_INDEX_Y] =
                         node.yCoord;
                     searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] =
                         OPEN_LIST;
@@ -621,7 +580,8 @@ namespace NRH5Roguelike.Utility
             if (searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX] ==
                 NOT_LISTED &&
                 monster.isWalkable(
-                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
+                level.dungeonLayer.getTile((short)(node.xCoord - 1), 
+                (short)(node.yCoord + 1))))
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
                     , (short)(node.xCoord - 1)));
@@ -637,11 +597,11 @@ namespace NRH5Roguelike.Utility
                     tempG;
                 searchSpace[node.yCoord + 1, node.xCoord - 1, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord + 1, node.xCoord - 1, PARENT_INDEX_X] =
+                searchSpace[node.yCoord + 1, node.xCoord - 1, PARENT_INDEX_Y] =
                     node.yCoord;
             }
             else if (searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX]
-                == NOT_LISTED)
+                == CLOSED_LIST)
             {
                 tempG = (short)
                     (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
@@ -654,7 +614,7 @@ namespace NRH5Roguelike.Utility
                     searchSpace[node.yCoord + 1, node.xCoord - 1,
                         PARENT_INDEX_X] = node.xCoord;
                     searchSpace[node.yCoord + 1, node.xCoord - 1,
-                        PARENT_INDEX_X] = node.yCoord;
+                        PARENT_INDEX_Y] = node.yCoord;
                     searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX] =
                         OPEN_LIST;
                     NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
@@ -667,7 +627,8 @@ namespace NRH5Roguelike.Utility
             if (searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] ==
                 NOT_LISTED &&
                 monster.isWalkable(
-                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
+                level.dungeonLayer.getTile((short)(node.xCoord - 1), 
+                node.yCoord)))
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord)
                     , (short)(node.xCoord - 1)));
@@ -683,11 +644,11 @@ namespace NRH5Roguelike.Utility
                     tempG;
                 searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_X] =
+                searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_Y] =
                     node.yCoord;
             }
             else if (searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] ==
-                NOT_LISTED)
+                CLOSED_LIST)
             {
                 tempG = (short)
                     (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
@@ -698,7 +659,7 @@ namespace NRH5Roguelike.Utility
                         tempG;
                     searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_X] =
                         node.xCoord;
-                    searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_X] =
+                    searchSpace[node.yCoord, node.xCoord - 1, PARENT_INDEX_Y] =
                         node.yCoord;
                     searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] =
                         OPEN_LIST;
@@ -712,7 +673,8 @@ namespace NRH5Roguelike.Utility
             if (searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX] ==
                 NOT_LISTED &&
                 monster.isWalkable(
-                level.dungeonLayer.getTile(node.xCoord, node.yCoord)))
+                level.dungeonLayer.getTile((short)(node.xCoord - 1), 
+                (short)(node.yCoord - 1))))
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
                     , (short)(node.xCoord - 1)));
@@ -728,11 +690,11 @@ namespace NRH5Roguelike.Utility
                     tempG;
                 searchSpace[node.yCoord - 1, node.xCoord - 1, PARENT_INDEX_X] =
                     node.xCoord;
-                searchSpace[node.yCoord - 1, node.xCoord - 1, PARENT_INDEX_X] =
+                searchSpace[node.yCoord - 1, node.xCoord - 1, PARENT_INDEX_Y] =
                     node.yCoord;
             }
             else if (searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX]
-                == NOT_LISTED)
+                == CLOSED_LIST)
             {
                 tempG = (short)
                     (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
@@ -745,7 +707,7 @@ namespace NRH5Roguelike.Utility
                     searchSpace[node.yCoord - 1, node.xCoord - 1,
                         PARENT_INDEX_X] = node.xCoord;
                     searchSpace[node.yCoord - 1, node.xCoord - 1,
-                        PARENT_INDEX_X] = node.yCoord;
+                        PARENT_INDEX_Y] = node.yCoord;
                     searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX] =
                         OPEN_LIST;
                     NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
