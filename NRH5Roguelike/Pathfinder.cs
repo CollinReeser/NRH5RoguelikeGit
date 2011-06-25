@@ -62,6 +62,13 @@
 // - Polish
 //
 
+// Preprocessor directives
+#define DEBUG
+#define TEST
+#undef DEBUG
+//#undef TEST
+
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -118,19 +125,34 @@ namespace NRH5Roguelike.Utility
 
 
             // PATHFINDING TESTS
+#if TEST
             Stopwatch st = new Stopwatch();
             for (int i = 0; i < 500000; i++)
             {
                 st.Start();
+#endif
                 //Console.WriteLine(
                 pathfind(monster, dungeon, monster.XCoord, monster.YCoord,
                 (short)30,
-                (short)30);//.directionOfPath);
+                (short)45);//.directionOfPath);
+#if TEST
                 st.Stop();
             }
             Console.WriteLine(st.ElapsedMilliseconds/500000.0);
-            // PATHFINDING TESTS
-
+#endif
+                // PATHFINDING TESTS
+#if DEBUG
+            for (int i = 0; i < path.GetLength(0); i++)
+            {
+                for (int j = 0; j < path.GetLength(1); j++)
+                {
+                    Console.Write(path[i,j]);
+                }
+            }
+            Console.WriteLine("Search Space:");
+            printSearchspace();
+            NodeHeap.printNodeHeap();
+#endif
 
             // While the user has not closed the window and while the user has
             // not pressed escape, do stuff
@@ -161,8 +183,21 @@ namespace NRH5Roguelike.Utility
         private static readonly short NOT_LISTED = 0;
         private static readonly short OPEN_LIST = 1;
         // Used as a testibly modifiable value for the H-Score incrementation
-        // amount, variable based on the prettiness of the resultant path
-        static readonly short H_SCORE_CONSTANT = 10;
+        // amount for diagonals, variable based on the prettiness of the 
+        // resultant path.
+        // 10 makes for what would be straight paths choosing to veer off course
+        // without actually providing a non-optimal path
+        static readonly short H_SCORE_DIAG_CONSTANT = 14;
+        // The basic value for non-diagonal heuristic movements. The two values
+        // only exist to allow for modifications based on the prettiness of the
+        // result
+        static readonly short H_SCORE_CARD_CONSTANT = 10;
+        // This is the value that represents each addition to the G-Score of a
+        // new node that is cardinal to the parent node
+        static readonly short G_SCORE_CARD_CONSTANT = 10;
+        // This is the value that represents each addition to the G-Score of a
+        // new node that is diagonal to the parent node
+        static readonly short G_SCORE_DIAG_CONSTANT = 10;
         // Used to hold the end location so that it isn't passed between method
         // calls unnecessarily
         private static short currentEndXCoord;
@@ -182,6 +217,9 @@ namespace NRH5Roguelike.Utility
         private static short temp;
         // Used to calculate direction of path
         private static PathfindTile lastTile;
+#if DEBUG
+        public static char[,] path;
+#endif
 
         // This is the search space used to undergo the pathfinding algorithm
         // within. The first and second indexes are the Y and X coordinates
@@ -274,36 +312,67 @@ namespace NRH5Roguelike.Utility
             // Create the first tile, to represent the start tile. The F-Score
             // is a G-Score of 0 (start node), and the full heuristic
             PathfindTile currentTile =
-                new PathfindTile(startXCoord, startYCoord,
-                /*0 +*/ calcHeuristic(startXCoord, startYCoord));
+                new PathfindTile(startYCoord, startXCoord,
+                /*0 +*/ calcHeuristic(startYCoord, startXCoord));
             // Do while we are not currently exploring the end node and there is
             // more in the list
             do
             {
+                // Expand the node to explore its neighbors
+                expandNode(currentTile);
                 // Add the tile to the closed list
                 searchSpace[currentTile.yCoord, currentTile.xCoord,
                     LIST_INDEX] = CLOSED_LIST;
-                // Expand the node to explore its neighbors
-                expandNode(currentTile);
                 // Pull the root tile, which should be the most optimal tile
                 // to explore next
                 currentTile = NodeHeap.pullRoot();
+#if DEBUG
+                Console.WriteLine(currentTile.fScore);
+                //NodeHeap.printNodeHeap();
+                //printSearchspace();
+#endif
             } while (searchSpace[currentTile.yCoord, currentTile.xCoord,
                 NODE_TYPE_INDEX] != END_NODE && !NodeHeap.isHeapEmpty());
             // If we found the end node, then calculate a path back
             if (searchSpace[currentTile.yCoord, currentTile.xCoord,
                 NODE_TYPE_INDEX] == END_NODE)
             {
-                pathLength = 0;
+#if DEBUG
+                path = new char[
+                    level.getDungeonHeight() , level.getDungeonWidth()];
+                for (int i = 0; i < path.GetLength(0); i++)
+                {
+                    for (int j = 0; j < path.GetLength(1); j++)
+                    {
+                        path[i, j] = '.';
+                    }
+                }
+#endif
+                    pathLength = 0;
                 while (searchSpace[currentTile.yCoord, currentTile.xCoord,
                     NODE_TYPE_INDEX] != START_NODE)
                 {
                     lastTile = currentTile;
+#if DEBUG
+                    path[lastTile.yCoord,lastTile.xCoord] = 'O';
+                    if (searchSpace[currentTile.yCoord, currentTile.xCoord,
+                    NODE_TYPE_INDEX] == END_NODE)
+                    {
+                        path[lastTile.yCoord, lastTile.xCoord] = 'E';
+                    }
+#endif
                     temp = searchSpace[currentTile.yCoord,
                         currentTile.xCoord, PARENT_INDEX_X];
                     currentTile.yCoord = searchSpace[currentTile.yCoord,
                         currentTile.xCoord, PARENT_INDEX_Y];
                     currentTile.xCoord = temp;
+#if DEBUG
+                    if (searchSpace[currentTile.yCoord, currentTile.xCoord,
+                    NODE_TYPE_INDEX] == START_NODE)
+                    {
+                        path[currentTile.yCoord, currentTile.xCoord] = 'S';
+                    }
+#endif
                     pathLength++;
                 }
                 return new PathfindData(
@@ -337,8 +406,13 @@ namespace NRH5Roguelike.Utility
                 // Calculcate and preserve the H and G scores for the new node
                 tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
                     , (short)(node.xCoord)));
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, node.xCoord, 
+                    (short)(node.yCoord - 1)) ? (short)(searchSpace[node.yCoord, 
+                    node.xCoord, 
+                    G_SCORE_INDEX] + G_SCORE_CARD_CONSTANT) : 
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 // Add node to heap
                 NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
                     node.xCoord, (short)(tempH + tempG)));
@@ -365,8 +439,13 @@ namespace NRH5Roguelike.Utility
                 CLOSED_LIST)
             {
                 // Calculate what the new G-Score would be
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, node.xCoord, 
+                    (short)(node.yCoord - 1)) ?
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 // If the new G-Score is better than what it was before, then
                 // update the node, add it back to the open list, and carry on
                 if (tempG <
@@ -399,8 +478,14 @@ namespace NRH5Roguelike.Utility
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
                     , (short)(node.xCoord + 1)));
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord + 1), 
+                    (short)(node.yCoord - 1))
+                    ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
                     (short)(node.xCoord + 1), (short)(tempH + tempG)));
                 searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX] =
@@ -417,8 +502,14 @@ namespace NRH5Roguelike.Utility
             else if (searchSpace[node.yCoord - 1, node.xCoord + 1, LIST_INDEX]
                 == CLOSED_LIST)
             {
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord + 1), 
+                    (short)(node.yCoord - 1)) ?
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 if (tempG <
                     searchSpace[node.yCoord - 1, node.xCoord + 1,
                     G_SCORE_INDEX])
@@ -446,8 +537,13 @@ namespace NRH5Roguelike.Utility
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord)
                     , (short)(node.xCoord + 1)));
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord + 1),
+                    node.yCoord) ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +
+                    G_SCORE_DIAG_CONSTANT);
                 NodeHeap.pushNode(new PathfindTile((short)(node.yCoord),
                     (short)(node.xCoord + 1), (short)(tempH + tempG)));
                 searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] =
@@ -464,8 +560,13 @@ namespace NRH5Roguelike.Utility
             else if (searchSpace[node.yCoord, node.xCoord + 1, LIST_INDEX] ==
                 CLOSED_LIST)
             {
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord + 1),
+                    node.yCoord) ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +
+                    G_SCORE_DIAG_CONSTANT);
                 if (tempG <
                     searchSpace[node.yCoord, node.xCoord + 1, G_SCORE_INDEX])
                 {
@@ -492,8 +593,14 @@ namespace NRH5Roguelike.Utility
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
                     , (short)(node.xCoord + 1)));
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord + 1), 
+                    (short)(node.yCoord + 1))
+                    ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
                     (short)(node.xCoord + 1), (short)(tempH + tempG)));
                 searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX] =
@@ -510,8 +617,14 @@ namespace NRH5Roguelike.Utility
             else if (searchSpace[node.yCoord + 1, node.xCoord + 1, LIST_INDEX]
                 == CLOSED_LIST)
             {
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord + 1), 
+                    (short)(node.yCoord + 1))
+                    ? (short)(searchSpace[node.yCoord, node.xCoord,
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 if (tempG <
                     searchSpace[node.yCoord + 1, node.xCoord + 1,
                     G_SCORE_INDEX])
@@ -539,8 +652,13 @@ namespace NRH5Roguelike.Utility
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
                     , (short)(node.xCoord)));
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, node.xCoord,
+                    (short)(node.yCoord + 1)) ?
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
                     node.xCoord, (short)(tempH + tempG)));
                 searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] =
@@ -557,8 +675,13 @@ namespace NRH5Roguelike.Utility
             else if (searchSpace[node.yCoord + 1, node.xCoord, LIST_INDEX] ==
                 CLOSED_LIST)
             {
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, node.xCoord, 
+                    (short)(node.yCoord + 1))
+                    ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 if (tempG <
                     searchSpace[node.yCoord + 1, node.xCoord, G_SCORE_INDEX])
                 {
@@ -585,8 +708,14 @@ namespace NRH5Roguelike.Utility
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord + 1)
                     , (short)(node.xCoord - 1)));
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord - 1), 
+                    (short)(node.yCoord + 1))
+                    ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 NodeHeap.pushNode(new PathfindTile((short)(node.yCoord + 1),
                     (short)(node.xCoord - 1), (short)(tempH + tempG)));
                 searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX] =
@@ -603,8 +732,14 @@ namespace NRH5Roguelike.Utility
             else if (searchSpace[node.yCoord + 1, node.xCoord - 1, LIST_INDEX]
                 == CLOSED_LIST)
             {
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord - 1), 
+                    (short)(node.yCoord + 1))
+                    ? (short)(searchSpace[node.yCoord, node.xCoord,
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +
+                    G_SCORE_DIAG_CONSTANT);
                 if (tempG <
                     searchSpace[node.yCoord + 1, node.xCoord - 1,
                     G_SCORE_INDEX])
@@ -632,8 +767,13 @@ namespace NRH5Roguelike.Utility
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord)
                     , (short)(node.xCoord - 1)));
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord - 1),
+                    node.yCoord) ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 NodeHeap.pushNode(new PathfindTile((short)(node.yCoord),
                     (short)(node.xCoord - 1), (short)(tempH + tempG)));
                 searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] =
@@ -650,8 +790,13 @@ namespace NRH5Roguelike.Utility
             else if (searchSpace[node.yCoord, node.xCoord - 1, LIST_INDEX] ==
                 CLOSED_LIST)
             {
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord - 1),
+                    node.yCoord) ? (short)(searchSpace[node.yCoord, node.xCoord,
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 if (tempG <
                     searchSpace[node.yCoord, node.xCoord - 1, G_SCORE_INDEX])
                 {
@@ -678,8 +823,14 @@ namespace NRH5Roguelike.Utility
             {
                 tempH = (short)(calcHeuristic((short)(node.yCoord - 1)
                     , (short)(node.xCoord - 1)));
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord - 1), 
+                    (short)(node.yCoord - 1))
+                    ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 NodeHeap.pushNode(new PathfindTile((short)(node.yCoord - 1),
                     (short)(node.xCoord - 1), (short)(tempH + tempG)));
                 searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX] =
@@ -696,8 +847,14 @@ namespace NRH5Roguelike.Utility
             else if (searchSpace[node.yCoord - 1, node.xCoord - 1, LIST_INDEX]
                 == CLOSED_LIST)
             {
-                tempG = (short)
-                    (searchSpace[node.yCoord, node.xCoord, G_SCORE_INDEX] + 10);
+                tempG = isCardOrDiag(node.xCoord,node.yCoord, 
+                    (short)(node.xCoord - 1), 
+                    (short)(node.yCoord - 1))
+                    ? (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] +  G_SCORE_CARD_CONSTANT) :
+                    (short)(searchSpace[node.yCoord, node.xCoord, 
+                    G_SCORE_INDEX] + 
+                    G_SCORE_DIAG_CONSTANT);
                 if (tempG <
                     searchSpace[node.yCoord - 1, node.xCoord - 1,
                     G_SCORE_INDEX])
@@ -725,10 +882,9 @@ namespace NRH5Roguelike.Utility
         //             short yCoord , the x and y coordinates of the current
         //             node location
         // Returns: An H-score of the heuristic
-        private static short calcHeuristic(short xCoord, short yCoord)
+        private static short calcHeuristic(short yCoord, short xCoord)
         {
             short hScore = 0;
-            bool isEnd = false;
             // Keep looping and incrementing the hScore by a value until the
             // end node is reached. The xCoord and yCoord values will be used
             // as the temp values because the starting value is only needed
@@ -739,42 +895,59 @@ namespace NRH5Roguelike.Utility
                 if (xCoord < currentEndXCoord)
                 {
                     xCoord++;
+                    // Calculate movement of y portion
+                    if (yCoord < currentEndYCoord)
+                    {
+                        yCoord++;
+                        // Diagonal heuristic movement
+                        hScore += H_SCORE_DIAG_CONSTANT;
+                    }
+                    else if (yCoord > currentEndYCoord)
+                    {
+                        yCoord--;
+                        hScore += H_SCORE_DIAG_CONSTANT;
+                    }
+                    else
+                    {
+                        // Horizontal heuristic movement
+                        hScore += H_SCORE_CARD_CONSTANT;
+                    }
                 }
                 else if (xCoord > currentEndXCoord)
                 {
                     xCoord--;
+                    if (yCoord < currentEndYCoord)
+                    {
+                        yCoord++;
+                        hScore += H_SCORE_DIAG_CONSTANT;
+                    }
+                    else if (yCoord > currentEndYCoord)
+                    {
+                        yCoord--;
+                        hScore += H_SCORE_DIAG_CONSTANT;
+                    }
+                    else
+                    {
+                        hScore += H_SCORE_CARD_CONSTANT;
+                    }
                 }
                 else
                 {
-                    // Here, we predict that we are at the end node. If the
-                    // y-coordinate gets changed later on, then we weren't and
-                    // this is switched back to false. If we arrive at the 
-                    // "else" condition for y as well, then we know we are at
-                    // the end node
-                    isEnd = true;
-                }
-                // Calculate movement of y portion
-                if (yCoord < currentEndYCoord)
-                {
-                    yCoord++;
-                    isEnd = false;
-                }
-                else if (yCoord > currentEndYCoord)
-                {
-                    yCoord--;
-                    isEnd = false;
-                }
-                else
-                {
-                    // If isEnd is true when we get here, then we are at the end
-                    // node and must stop
-                    if (isEnd)
+                    if (yCoord < currentEndYCoord)
+                    {
+                        yCoord++;
+                        hScore += H_SCORE_CARD_CONSTANT;
+                    }
+                    else if (yCoord > currentEndYCoord)
+                    {
+                        yCoord--;
+                        hScore += H_SCORE_CARD_CONSTANT;
+                    }
+                    else
                     {
                         break;
                     }
                 }
-                // Increment hScore after moving the node
-                hScore += H_SCORE_CONSTANT;
             }
             return hScore;
         }
@@ -866,6 +1039,46 @@ namespace NRH5Roguelike.Utility
             }
         }
 
+        // Name: isCardOrDiag
+        // Description: Takes two point coordinates, and returns true or false
+        //              if the direction from one point to the other is a
+        //              cardinal direction or if it requires diagonal movement
+        // Parameters: short x1 ,
+        //             short y1 ,
+        //             short x2 ,
+        //             short y2 , the coordinates of two points
+        // Returns: True is the direction is cardinal, and false otherwise
+        public static bool isCardOrDiag( short x1 , short y1 , short x2 ,
+            short y2 )
+        {
+            if (x1 < x2)
+            {
+                if (y1 == y2)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else if (x1 > x2)
+            {
+                if (y1 == y2)
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                return true;
+            }
+        }
+
         // Name: PathfindData
         // Description: Is constructed with data pertaining to the result of a 
         //              pathfind operation
@@ -886,6 +1099,34 @@ namespace NRH5Roguelike.Utility
             public readonly Pathfinder.Direction directionOfPath;
             public readonly short lengthOfPath;
         }
+
+#if DEBUG
+        private static void printSearchspace()
+        {
+            for (int i = 0; i < searchSpace.GetLength(0); i++)
+            {
+                for (int j = 0; j < searchSpace.GetLength(1); j++)
+                {
+                    if (searchSpace[i, j, LIST_INDEX] != NOT_LISTED)
+                    {
+                        if (searchSpace[i, j, NODE_TYPE_INDEX] == NORMAL_NODE)
+                        {
+                            Console.Write('O');
+                        }
+                        else
+                        {
+                            Console.Write('S');
+                        }
+                    }
+                    else
+                    {
+                        Console.Write('.');
+                    }
+                }
+            }
+        }
+#endif
+
     }
 
     // Name: PathfindTile
@@ -896,7 +1137,7 @@ namespace NRH5Roguelike.Utility
         public short yCoord;
         // Arbitrarily high value for initialization
         public short fScore;
-        public PathfindTile(short xCoord, short yCoord, short fScore)
+        public PathfindTile(short yCoord, short xCoord, short fScore)
         {
             this.xCoord = xCoord;
             this.yCoord = yCoord;
@@ -928,8 +1169,8 @@ namespace NRH5Roguelike.Utility
             if (pathfindList != null && pathfindList.Length !=
                 (level.getDungeonWidth() - 1) * (level.getDungeonHeight() - 1))
             {
-                pathfindList = new PathfindTile[(level.getDungeonWidth() - 1) *
-                    (level.getDungeonHeight() - 1)];
+                pathfindList = new PathfindTile[(level.getDungeonHeight() - 1) *
+                    (level.getDungeonWidth() - 1)];
                 for (short i = 0; i < pathfindList.Length; i++)
                 {
                     pathfindList[i] = new PathfindTile(-1, -1,
@@ -940,8 +1181,8 @@ namespace NRH5Roguelike.Utility
             // If it was null, create and initialize
             else
             {
-                pathfindList = new PathfindTile[(level.getDungeonWidth() - 1) *
-                    (level.getDungeonHeight() - 1)];
+                pathfindList = new PathfindTile[(level.getDungeonHeight() - 1) *
+                    (level.getDungeonWidth() - 1)];
                 for (short i = 0; i < pathfindList.Length; i++)
                 {
                     pathfindList[i] = new PathfindTile(-1, -1,
@@ -1070,6 +1311,7 @@ namespace NRH5Roguelike.Utility
             pathfindList[node2] = temp;
         }
 
+#if DEBUG
         // Name: printNodeHeap
         // Description: Simple method that prints the first few values of the
         //              list. Magic numbers exist here because the method only
@@ -1082,6 +1324,7 @@ namespace NRH5Roguelike.Utility
             }
             Console.WriteLine();
         }
+#endif
 
         // Name: isHeapEmpty
         // Description: Returns true if endTracker refers to an end that is the
