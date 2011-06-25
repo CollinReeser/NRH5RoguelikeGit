@@ -61,10 +61,21 @@
 // - Finish algorithm
 // - Polish
 //
+// Speed of Algorithm:
+// - Initial: ~310 microseconds
+// - Fixed glaring bug: ~270-290 microseconds
+// - Optimized heuristic: ~541 microseconds. CLEARLY SOMETHING IS WRONG HERE.
+//      Consider writing own Abs function or inlining the functionality to see
+//      if the issue is with the library abs call. This math solution should
+//      be faster by all accounts, and absolutely NOT doubling the length of
+//      the algorithm. Solution to be made soon.
+//
 
 // Preprocessor directives
 #define DEBUG
 #define TEST
+#define OPTIM
+#undef OPTIM
 #undef DEBUG
 //#undef TEST
 
@@ -134,7 +145,7 @@ namespace NRH5Roguelike.Utility
                 //Console.WriteLine(
                 pathfind(monster, dungeon, monster.XCoord, monster.YCoord,
                 (short)30,
-                (short)45);//.directionOfPath);
+                (short)40);//.directionOfPath);
 #if TEST
                 st.Stop();
             }
@@ -314,6 +325,9 @@ namespace NRH5Roguelike.Utility
             PathfindTile currentTile =
                 new PathfindTile(startYCoord, startXCoord,
                 /*0 +*/ calcHeuristic(startYCoord, startXCoord));
+#if OPTIM
+            Console.WriteLine(calcHeuristic2((short)10,(short)10));
+#endif
             // Do while we are not currently exploring the end node and there is
             // more in the list
             do
@@ -875,9 +889,10 @@ namespace NRH5Roguelike.Utility
             }
         }
 
-        // Name: calcHeuristic
+        // Name: calcHeuristic2
         // Description: Return an as-the-crow-flies heuristic to the end point
-        //              from the passed current location
+        //              from the passed current location. This is the
+        //              obsolete version
         // Parameters: short xCoord ,
         //             short yCoord , the x and y coordinates of the current
         //             node location
@@ -950,6 +965,63 @@ namespace NRH5Roguelike.Utility
                 }
             }
             return hScore;
+        }
+
+        // Name: calcHeuristic
+        // Description: Return an as-the-crow-flies heuristic to the end point
+        //              from the passed current location
+        // Parameters: short xCoord ,
+        //             short yCoord , the x and y coordinates of the current
+        //             node location
+        // Returns: An H-score of the heuristic
+        private static short calcHeuristic2(short yCoord, short xCoord)
+        {
+            if (yCoord != currentEndYCoord)
+            {
+                if (xCoord != currentEndXCoord)
+                {
+                    short hScore = 0;
+                    if (Math.Abs(xCoord - currentEndXCoord) >
+                        Math.Abs(yCoord - currentEndYCoord))
+                    {
+                        // Incorporate the diagonal portion
+                        hScore += (short)(Math.Abs(yCoord - currentEndYCoord) *
+                            H_SCORE_DIAG_CONSTANT);
+                        hScore += (short)Math.Abs((Math.Abs(xCoord - currentEndXCoord) -
+                            Math.Abs(yCoord - currentEndYCoord)) *
+                            H_SCORE_CARD_CONSTANT);
+                        return hScore;
+                    }
+                    else/* if (Math.Abs(xCoord - currentEndXCoord) <
+                        Math.Abs(yCoord - currentEndYCoord))*/
+                    {
+                        hScore += (short)(Math.Abs(xCoord - currentEndXCoord) *
+                            H_SCORE_DIAG_CONSTANT);
+                        hScore += (short)Math.Abs((Math.Abs(yCoord - currentEndYCoord) -
+                            Math.Abs(xCoord - currentEndXCoord)) *
+                            H_SCORE_CARD_CONSTANT);
+                        return hScore;
+                    }
+                    /*else
+                    {
+                        return hScore += (short)(Math.Abs(xCoord - 
+                            currentEndXCoord) * H_SCORE_DIAG_CONSTANT);
+                    }*/
+                }
+                else
+                {
+                    // The x coordinate is the same, so cardinal
+                    return (short)(Math.Abs(yCoord - currentEndYCoord) *
+                    H_SCORE_CARD_CONSTANT);
+                }
+            }
+            else
+            {
+                // If y is the same to begin with then it is cardinal and the
+                // heuristic is simply this
+                return (short)(Math.Abs(xCoord - currentEndXCoord) * 
+                    H_SCORE_CARD_CONSTANT);
+            }
         }
 
         // Name: clearSearchSpace
