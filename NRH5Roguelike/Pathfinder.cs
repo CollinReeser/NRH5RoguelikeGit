@@ -61,7 +61,7 @@
 // - Finish algorithm
 // - Polish
 //
-// Speed of Algorithm:
+// Speed of Algorithm (from (10,10) to (30,40)):
 // - Initial: ~310 microseconds
 // - Fixed glaring bug: ~270-290 microseconds
 // - Optimized heuristic: ~541 microseconds. CLEARLY SOMETHING IS WRONG HERE.
@@ -69,15 +69,27 @@
 //      if the issue is with the library abs call. This math solution should
 //      be faster by all accounts, and absolutely NOT doubling the length of
 //      the algorithm. Solution to be made soon.
+// - Fixed optimized heuristic: ~451 microseconds. Doesn't make sense.
+// - Redacted: Optimized initialization method based on profiler data: 
+//   ~130 microseconds
+//      (And this is using the new, bad heuristic. Testing to be done.)
+// - Redacted: After switching to old heuristic: ~131 microseconds
+//      (So somehow using the new heuristic made something else slow entirely,
+//      but I guess now they're even? *sigh*)
+// - Redacted: After optimizing clearSearchspace(): ~51 microseconds
+// - Was on the wrong pathing settings. Current speed after previous
+//   optimizations: ~113 microseconds. Still good.
 //
 
 // Preprocessor directives
 #define DEBUG
 #define TEST
 #define OPTIM
+#define GUI
 #undef OPTIM
 #undef DEBUG
 //#undef TEST
+//#undef GUI
 
 
 using System;
@@ -106,6 +118,7 @@ namespace NRH5Roguelike.Utility
             //dependant things can be easily updated
             const int WINDOW_WIDTH = 80;
             const int WINDOW_HEIGHT = 55;
+#if GUI
             // Display an initializing message to the console
             Console.WriteLine("Initilizing game window...");
             // Create the new libtcod output window. This needs to be done only
@@ -127,6 +140,7 @@ namespace NRH5Roguelike.Utility
             // called. Try to minimize this call
             TCODConsole.flush();
             TCODKey Key = TCODConsole.checkForKeypress();
+#endif
             // Create dungeon objects eventually to be used for pathfinding test
             Monster monster = new Monster();
             // Set the bit for isPlayer in the bitfield
@@ -164,7 +178,7 @@ namespace NRH5Roguelike.Utility
             printSearchspace();
             NodeHeap.printNodeHeap();
 #endif
-
+#if GUI
             // While the user has not closed the window and while the user has
             // not pressed escape, do stuff
             while (!TCODConsole.isWindowClosed())
@@ -173,6 +187,7 @@ namespace NRH5Roguelike.Utility
                 TCODConsole.flush();
                 dungeon.doAction();
             }
+#endif
         }
         public static readonly short ARB_HIGH = 30000;
         // This refers to the number of attributes a given node has within the
@@ -326,7 +341,7 @@ namespace NRH5Roguelike.Utility
                 new PathfindTile(startYCoord, startXCoord,
                 /*0 +*/ calcHeuristic(startYCoord, startXCoord));
 #if OPTIM
-            Console.WriteLine(calcHeuristic2((short)10,(short)10));
+            Console.WriteLine(calcHeuristic((short)10,(short)10));
 #endif
             // Do while we are not currently exploring the end node and there is
             // more in the list
@@ -892,12 +907,15 @@ namespace NRH5Roguelike.Utility
         // Name: calcHeuristic2
         // Description: Return an as-the-crow-flies heuristic to the end point
         //              from the passed current location. This is the
-        //              obsolete version
+        //              obsolete, better version. Go figure. Using this for
+        //              now until the reason why the "better" version is worse
+        //              is identified. Redacted. They both seem to be equal.
+        //              Going with new version for the sake of pride
         // Parameters: short xCoord ,
         //             short yCoord , the x and y coordinates of the current
         //             node location
         // Returns: An H-score of the heuristic
-        private static short calcHeuristic(short yCoord, short xCoord)
+        private static short calcHeuristic2(short yCoord, short xCoord)
         {
             short hScore = 0;
             // Keep looping and incrementing the hScore by a value until the
@@ -969,36 +987,41 @@ namespace NRH5Roguelike.Utility
 
         // Name: calcHeuristic
         // Description: Return an as-the-crow-flies heuristic to the end point
-        //              from the passed current location
+        //              from the passed current location. Worse than old
+        //              version. Redacted. They appear equal
         // Parameters: short xCoord ,
         //             short yCoord , the x and y coordinates of the current
         //             node location
         // Returns: An H-score of the heuristic
-        private static short calcHeuristic2(short yCoord, short xCoord)
+        private static short calcHeuristic(short yCoord, short xCoord)
         {
             if (yCoord != currentEndYCoord)
             {
                 if (xCoord != currentEndXCoord)
                 {
                     short hScore = 0;
-                    if (Math.Abs(xCoord - currentEndXCoord) >
-                        Math.Abs(yCoord - currentEndYCoord))
+                    if (Pathfinder.abs(xCoord - currentEndXCoord) >
+                        Pathfinder.abs(yCoord - currentEndYCoord))
                     {
                         // Incorporate the diagonal portion
-                        hScore += (short)(Math.Abs(yCoord - currentEndYCoord) *
+                        hScore += (short)(Pathfinder.abs(yCoord - 
+                            currentEndYCoord) *
                             H_SCORE_DIAG_CONSTANT);
-                        hScore += (short)Math.Abs((Math.Abs(xCoord - currentEndXCoord) -
-                            Math.Abs(yCoord - currentEndYCoord)) *
+                        hScore += (short)Pathfinder.abs((Pathfinder.abs(xCoord 
+                            - currentEndXCoord) -
+                            Pathfinder.abs(yCoord - currentEndYCoord)) *
                             H_SCORE_CARD_CONSTANT);
                         return hScore;
                     }
                     else/* if (Math.Abs(xCoord - currentEndXCoord) <
                         Math.Abs(yCoord - currentEndYCoord))*/
                     {
-                        hScore += (short)(Math.Abs(xCoord - currentEndXCoord) *
+                        hScore += (short)(Pathfinder.abs(xCoord - 
+                            currentEndXCoord) *
                             H_SCORE_DIAG_CONSTANT);
-                        hScore += (short)Math.Abs((Math.Abs(yCoord - currentEndYCoord) -
-                            Math.Abs(xCoord - currentEndXCoord)) *
+                        hScore += (short)Pathfinder.abs((Pathfinder.abs(yCoord -
+                            currentEndYCoord) -
+                            Pathfinder.abs(xCoord - currentEndXCoord)) *
                             H_SCORE_CARD_CONSTANT);
                         return hScore;
                     }
@@ -1011,7 +1034,7 @@ namespace NRH5Roguelike.Utility
                 else
                 {
                     // The x coordinate is the same, so cardinal
-                    return (short)(Math.Abs(yCoord - currentEndYCoord) *
+                    return (short)(Pathfinder.abs(yCoord - currentEndYCoord) *
                     H_SCORE_CARD_CONSTANT);
                 }
             }
@@ -1019,7 +1042,7 @@ namespace NRH5Roguelike.Utility
             {
                 // If y is the same to begin with then it is cardinal and the
                 // heuristic is simply this
-                return (short)(Math.Abs(xCoord - currentEndXCoord) * 
+                return (short)(Pathfinder.abs(xCoord - currentEndXCoord) * 
                     H_SCORE_CARD_CONSTANT);
             }
         }
@@ -1034,6 +1057,7 @@ namespace NRH5Roguelike.Utility
         //              array is the more efficient system
         private static void clearSearchSpace()
         {
+            /*
             for (short y = 0; y < Pathfinder.searchSpace.GetLength(0); y++)
             {
                 for (short x = 0; x < Pathfinder.searchSpace.GetLength(1); x++)
@@ -1041,6 +1065,20 @@ namespace NRH5Roguelike.Utility
                     Pathfinder.searchSpace[y, x, LIST_INDEX] = NOT_LISTED;
                 }
             }
+            */
+            Pathfinder.searchSpace = new 
+                short[Pathfinder.searchSpace.GetLength(0), 
+                Pathfinder.searchSpace.GetLength(1), 
+                Pathfinder.NUM_OF_ELEMENTS];
+        }
+
+        // Name: abs
+        // Description: Return the absolute value of a passed int
+        // Parameters: int value , the value to find the absolute value of
+        // Returns: Absolute value of parameter
+        private static int abs(int value)
+        {
+            return (value < 0) ? value * -1 : value;
         }
 
         // Name: Direction
@@ -1245,8 +1283,7 @@ namespace NRH5Roguelike.Utility
                     (level.getDungeonWidth() - 1)];
                 for (short i = 0; i < pathfindList.Length; i++)
                 {
-                    pathfindList[i] = new PathfindTile(-1, -1,
-                        Pathfinder.ARB_HIGH);
+                    pathfindList[i].fScore = Pathfinder.ARB_HIGH;
                 }
                 endTracker = 0;
             }
@@ -1257,8 +1294,7 @@ namespace NRH5Roguelike.Utility
                     (level.getDungeonWidth() - 1)];
                 for (short i = 0; i < pathfindList.Length; i++)
                 {
-                    pathfindList[i] = new PathfindTile(-1, -1,
-                        Pathfinder.ARB_HIGH);
+                    pathfindList[i].fScore = Pathfinder.ARB_HIGH;
                 }
                 endTracker = 0;
             }
